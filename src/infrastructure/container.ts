@@ -67,6 +67,7 @@ function build() {
   const session = makeSessionService(authRepo, auth.sessionDays);
 
   return {
+    db,
     ingest,
     clustering,
     analysis,
