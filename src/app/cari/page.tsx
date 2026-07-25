@@ -16,7 +16,7 @@ export default async function CariPage({
   const { q = "" } = await searchParams;
   const query = q.trim();
   const { stories, articles } = query
-    ? getContainer().queries.searchAll(query)
+    ? await getContainer().queries.searchAll(query)
     : { stories: [], articles: [] };
 
   return (

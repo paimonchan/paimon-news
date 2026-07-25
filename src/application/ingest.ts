@@ -92,7 +92,7 @@ export function makeIngest(deps: {
   fetcher: FeedFetcher;
   clustering: ClusteringUseCase;
   analysis: AnalysisUseCase;
-  cleanup: { run(): CleanupResult };
+  cleanup: { run(): Promise<CleanupResult> };
 }): { run(options?: IngestOptions): Promise<FullIngestResult> } {
   const { feedRepo, articleRepo, fetcher, clustering, analysis, cleanup } = deps;
 
@@ -104,20 +104,20 @@ export function makeIngest(deps: {
       });
 
       if (result.status === 304) {
-        feedRepo.markNotModified(feed.id);
+        await feedRepo.markNotModified(feed.id);
         return { added: 0, skipped304: true };
       }
 
       let added = 0;
       for (const item of result.items) {
         const article = mapItemToArticle(item, feed);
-        if (article) added += articleRepo.insertIgnore(article);
+        if (article) added += await articleRepo.insertIgnore(article);
       }
 
-      feedRepo.markSuccess(feed.id, { etag: result.etag, lastModified: result.lastModified });
+      await feedRepo.markSuccess(feed.id, { etag: result.etag, lastModified: result.lastModified });
       return { added, skipped304: false };
     } catch (err) {
-      feedRepo.markFailure(feed.id);
+      await feedRepo.markFailure(feed.id);
       const message = err instanceof Error ? err.message : String(err);
       return { added: 0, skipped304: false, error: `Feed #${feed.id} (${feed.url}): ${message}` };
     }
@@ -127,11 +127,11 @@ export function makeIngest(deps: {
     async run(options: IngestOptions = {}): Promise<FullIngestResult> {
       const feeds =
         options.batchSize != null
-          ? feedRepo.listActiveBatch(
+          ? await feedRepo.listActiveBatch(
               (options.batchIndex ?? 0) * options.batchSize,
               options.batchSize
             )
-          : feedRepo.listActive();
+          : await feedRepo.listActive();
 
       const result: IngestResult = {
         feedsOk: 0,
@@ -157,11 +157,11 @@ export function makeIngest(deps: {
         }
       }
 
-      const clusterStats = clustering.assignNewArticles();
-      const merged = clustering.mergeSimilarStories();
-      clustering.refreshHotScores();
+      const clusterStats = await clustering.assignNewArticles();
+      const merged = await clustering.mergeSimilarStories();
+      await clustering.refreshHotScores();
 
-      const cleanupResult = cleanup.run();
+      const cleanupResult = await cleanup.run();
 
       let analyzed = 0;
       if (options.analyze !== false) {

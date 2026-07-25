@@ -13,7 +13,7 @@ export default async function DigestPage({
   searchParams: Promise<{ ok?: string; error?: string }>;
 }) {
   const { ok, error } = await searchParams;
-  const stories = getContainer().queries.getDigestStories(7);
+  const stories = await getContainer().queries.getDigestStories(7);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-6">

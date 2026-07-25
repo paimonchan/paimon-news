@@ -27,25 +27,23 @@ describe("magic link", () => {
 
   it("token hanya bisa dipakai sekali", async () => {
     const { authRepo, auth } = setup();
-    authRepo.createToken("token123", "user@contoh.id", 15);
+    await authRepo.createToken("token123", "user@contoh.id", 15);
 
     const session1 = await auth.verifyLoginToken("token123");
     expect(session1).not.toBeNull();
 
-    // pemakaian ulang ditolak
     const session2 = await auth.verifyLoginToken("token123");
     expect(session2).toBeNull();
 
-    // sesi mengarah ke user yang benar
-    const user = authRepo.findUserBySession(session1!);
+    const user = await authRepo.findUserBySession(session1!);
     expect(user?.email).toBe("user@contoh.id");
   });
 
   it("token kedaluwarsa ditolak", async () => {
     const { db, authRepo, auth } = setupWithDb();
-    db.prepare(
+    await db.run(
       "INSERT INTO auth_tokens (token, email, expires_at, created_at) VALUES ('tokenexp', 'user@contoh.id', datetime('now', '-1 hour'), datetime('now', '-2 hours'))"
-    ).run();
+    );
 
     expect(await auth.verifyLoginToken("tokenexp")).toBeNull();
   });

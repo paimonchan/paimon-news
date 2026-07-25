@@ -8,21 +8,20 @@ function setup() {
   const clustering = makeClustering({
     articleRepo: repos.articleRepo,
     storyRepo: repos.storyRepo,
-    transact: (fn) => repos.db.transaction(fn)(),
   });
   return { ...repos, clustering };
 }
 
-function insertSimilarPair(repos: ReturnType<typeof makeTestRepos>) {
-  const s1 = firstSourceId(repos.db);
+async function insertSimilarPair(repos: ReturnType<typeof makeTestRepos>) {
+  const s1 = await firstSourceId(repos.db);
   const s2 = (
-    repos.db.prepare("SELECT id FROM sources WHERE id != ? LIMIT 1").get(s1) as { id: number }
-  ).id;
+    await repos.db.get<{ id: number }>("SELECT id FROM sources WHERE id != ? LIMIT 1", s1)
+  )!;
 
   const t1 = "Gempa berkekuatan 5,2 mengguncang Aceh pagi ini";
   const t2 = "Gempa 5,2 guncang Aceh pagi ini, warga panik";
 
-  repos.articleRepo.insertIgnore(
+  await repos.articleRepo.insertIgnore(
     makeArticle({
       source_id: s1,
       title: t1,
@@ -30,9 +29,9 @@ function insertSimilarPair(repos: ReturnType<typeof makeTestRepos>) {
       title_tokens: [...tokenize(t1)].join(" "),
     })
   );
-  repos.articleRepo.insertIgnore(
+  await repos.articleRepo.insertIgnore(
     makeArticle({
-      source_id: s2,
+      source_id: s2.id,
       title: t2,
       category: "nasional",
       title_tokens: [...tokenize(t2)].join(" "),
@@ -41,27 +40,27 @@ function insertSimilarPair(repos: ReturnType<typeof makeTestRepos>) {
 }
 
 describe("clustering", () => {
-  it("artikel serupa dari sumber berbeda masuk story yang sama", () => {
+  it("artikel serupa dari sumber berbeda masuk story yang sama", async () => {
     const repos = setup();
-    insertSimilarPair(repos);
+    await insertSimilarPair(repos);
 
-    const stats = repos.clustering.assignNewArticles();
+    const stats = await repos.clustering.assignNewArticles();
     expect(stats.created).toBe(1);
     expect(stats.assigned).toBe(1);
 
-    const stories = repos.storyRepo.findRecent(48);
+    const stories = await repos.storyRepo.findRecent(48);
     expect(stories).toHaveLength(1);
     expect(stories[0].article_count).toBe(2);
     expect(stories[0].source_count).toBe(2);
   });
 
-  it("artikel sangat berbeda membuat story baru", () => {
+  it("artikel sangat berbeda membuat story baru", async () => {
     const repos = setup();
-    insertSimilarPair(repos);
+    await insertSimilarPair(repos);
 
-    const s1 = firstSourceId(repos.db);
+    const s1 = await firstSourceId(repos.db);
     const t3 = "Harga saham teknologi anjlok di bursa Amerika";
-    repos.articleRepo.insertIgnore(
+    await repos.articleRepo.insertIgnore(
       makeArticle({
         source_id: s1,
         title: t3,
@@ -70,18 +69,18 @@ describe("clustering", () => {
       })
     );
 
-    repos.clustering.assignNewArticles();
-    const stories = repos.storyRepo.findRecent(48);
+    await repos.clustering.assignNewArticles();
+    const stories = await repos.storyRepo.findRecent(48);
     expect(stories).toHaveLength(2);
   });
 
-  it("hot score story segar lebih tinggi dari story lama", () => {
+  it("hot score story segar lebih tinggi dari story lama", async () => {
     const repos = setup();
-    insertSimilarPair(repos);
-    repos.clustering.assignNewArticles();
-    repos.clustering.refreshHotScores();
+    await insertSimilarPair(repos);
+    await repos.clustering.assignNewArticles();
+    await repos.clustering.refreshHotScores();
 
-    const stories = repos.storyRepo.findRecent(48);
+    const stories = await repos.storyRepo.findRecent(48);
     expect(stories[0].hot_score).toBeGreaterThan(0);
   });
 });

@@ -7,7 +7,7 @@ export async function register() {
   const { getContainer } = await import("@/infrastructure/container");
   const container = getContainer();
 
-  const { total } = container.queries.getLatestArticles(1, 1);
+  const { total } = await container.queries.getLatestArticles(1, 1);
   if (total === 0) {
     console.log("[boot] Database kosong — menjalankan ingestion pertama di background…");
     container.ingest

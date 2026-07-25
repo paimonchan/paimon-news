@@ -18,8 +18,8 @@ export default async function HomePage({
   const { page: pageStr, ingested } = await searchParams;
   const page = Math.max(1, Number(pageStr) || 1);
   const { queries } = getContainer();
-  const { stories, total } = queries.getTopStories(page);
-  const categoryCounts = queries.getCategoryCounts();
+  const { stories, total } = await queries.getTopStories(page);
+  const categoryCounts = await queries.getCategoryCounts();
 
   const [feature, ...rest] = stories;
   const isDev = process.env.NODE_ENV === "development";

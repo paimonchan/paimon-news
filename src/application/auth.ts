@@ -30,13 +30,13 @@ export function makeAuth(deps: {
     sessionDays: SESSION_DAYS,
 
     async requestLogin(email: string): Promise<void> {
-      const recent = authRepo.countRecentTokens(email, 1);
+      const recent = await authRepo.countRecentTokens(email, 1);
       if (recent >= MAX_TOKENS_PER_HOUR) {
         throw new RateLimitError();
       }
 
       const token = crypto.randomBytes(24).toString("hex");
-      authRepo.createToken(token, email, TOKEN_MINUTES);
+      await authRepo.createToken(token, email, TOKEN_MINUTES);
 
       const link = `${baseUrl}/api/auth/verify?token=${token}`;
       await mailer.send({
@@ -56,7 +56,7 @@ export function makeAuth(deps: {
 
     async verifyLoginToken(token: string): Promise<string | null> {
       const sessionToken = crypto.randomBytes(24).toString("hex");
-      const email = authRepo.consumeTokenAndCreateSession(token, sessionToken, SESSION_DAYS);
+      const email = await authRepo.consumeTokenAndCreateSession(token, sessionToken, SESSION_DAYS);
       return email ? sessionToken : null;
     },
   };

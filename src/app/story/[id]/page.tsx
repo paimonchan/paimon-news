@@ -17,7 +17,7 @@ export async function generateMetadata({
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const { id } = await params;
-  const detail = getContainer().queries.getStoryDetail(Number(id));
+  const detail = await getContainer().queries.getStoryDetail(Number(id));
   if (!detail) return { title: "Peristiwa tidak ditemukan" };
   return {
     title: detail.story.title,
@@ -35,13 +35,13 @@ export default async function StoryPage({
   if (!Number.isInteger(storyId)) notFound();
 
   const container = getContainer();
-  const detail = container.queries.getStoryDetail(storyId);
+  const detail = await container.queries.getStoryDetail(storyId);
   if (!detail) notFound();
 
   const { story, analysis, articles } = detail;
   const user = await container.session.getSessionUser();
   const bookmarked = user
-    ? container.repos.bookmarkRepo.isBookmarked(user.id, storyId)
+    ? await container.repos.bookmarkRepo.isBookmarked(user.id, storyId)
     : false;
 
   const perspectives: Perspective[] = analysis?.perspectives_json
@@ -50,7 +50,7 @@ export default async function StoryPage({
   const facts: string[] = analysis?.facts_json
     ? (JSON.parse(analysis.facts_json) as string[])
     : [];
-  const related = container.queries.getRelatedStories(story.id, story.category);
+  const related = await container.queries.getRelatedStories(story.id, story.category);
 
   // satu artikel terbaru per sumber untuk perbandingan judul
   const perSource = articles.filter(

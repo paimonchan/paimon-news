@@ -3,24 +3,32 @@ import fs from "node:fs";
 import path from "node:path";
 import { runMigrations } from "./migrations";
 import { seedSources } from "./seed";
+import { makeSqliteQueryable } from "./sqlite-adapter";
+import type { Queryable } from "./queryable";
 
 export type Db = Database.Database;
+export type { Queryable };
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const DB_PATH = path.join(DATA_DIR, "lensa.db");
 
-// Satu koneksi per proses (aman untuk hot-reload dev via globalThis).
-const globalForDb = globalThis as unknown as { __lensaDb?: Db };
+const globalForDb = globalThis as unknown as { __lensaDb?: Queryable; __lensaRawDb?: Db };
 
-export function getDb(): Db {
+export function getDb(): Queryable {
   if (globalForDb.__lensaDb) return globalForDb.__lensaDb;
-  const db = openDb(DB_PATH);
-  globalForDb.__lensaDb = db;
-  return db;
+  const raw = openDbRaw(DB_PATH);
+  const q = makeSqliteQueryable(raw);
+  globalForDb.__lensaRawDb = raw;
+  globalForDb.__lensaDb = q;
+  return q;
 }
 
-/** Buka DB di path mana pun (dipakai juga oleh test dengan ':memory:'). */
-export function openDb(dbPath: string): Db {
+export function openDb(dbPath: string): Queryable {
+  const raw = openDbRaw(dbPath);
+  return makeSqliteQueryable(raw);
+}
+
+function openDbRaw(dbPath: string): Db {
   if (dbPath !== ":memory:") {
     fs.mkdirSync(path.dirname(dbPath), { recursive: true });
   }

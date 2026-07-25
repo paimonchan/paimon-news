@@ -1,5 +1,6 @@
 // Use case: digest harian — HTML email + pengiriman ke pelanggan.
 
+import crypto from "node:crypto";
 import type { DigestRepository, Mailer } from "./ports";
 import type { StoryCard } from "@/domain/entities";
 import { escapeHtml } from "@/domain/text";
@@ -50,7 +51,7 @@ export function makeDigest(deps: {
   digestRepo: DigestRepository;
   mailer: Mailer;
   baseUrl: string;
-  getDigestStories: (limit: number) => StoryCard[];
+  getDigestStories: (limit: number) => Promise<StoryCard[]>;
 }): {
   sendDigestEmails(): Promise<{ sent: number; failed: number }>;
   subscribe(email: string, userId: number | null): Promise<void>;
@@ -59,10 +60,10 @@ export function makeDigest(deps: {
 
   return {
     async sendDigestEmails() {
-      const stories = getDigestStories(7);
+      const stories = await getDigestStories(7);
       if (stories.length === 0) return { sent: 0, failed: 0 };
 
-      const subscribers = digestRepo.listActive();
+      const subscribers = await digestRepo.listActive();
       let sent = 0;
       let failed = 0;
 
@@ -81,7 +82,7 @@ export function makeDigest(deps: {
 
     async subscribe(email: string, userId: number | null) {
       const token = crypto.randomUUID().replace(/-/g, "");
-      digestRepo.upsertSubscription(email, userId, token);
+      await digestRepo.upsertSubscription(email, userId, token);
 
       await mailer.send({
         to: email,

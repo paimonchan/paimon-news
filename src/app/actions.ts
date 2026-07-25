@@ -52,7 +52,7 @@ export async function toggleBookmarkAction(formData: FormData) {
   const user = await container.session.getSessionUser();
   if (!user) redirect("/login");
 
-  container.repos.bookmarkRepo.toggle(user.id, storyId);
+  await container.repos.bookmarkRepo.toggle(user.id, storyId);
 
   revalidatePath(back);
   redirect(back);

@@ -10,6 +10,7 @@ export const config = {
 
   baseUrl: env("BASE_URL", "http://localhost:3000").replace(/\/$/, ""),
   cronSecret: env("CRON_SECRET"),
+  databaseUrl: env("DATABASE_URL"),
 
   ai: {
     apiKey: env("AI_API_KEY"),

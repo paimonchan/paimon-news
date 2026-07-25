@@ -13,7 +13,7 @@ export default async function TersimpanPage() {
   const user = await container.session.getSessionUser();
   if (!user) redirect("/login");
 
-  const stories = container.queries.getBookmarkedStories(user.id);
+  const stories = await container.queries.getBookmarkedStories(user.id);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-6">

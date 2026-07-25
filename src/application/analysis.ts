@@ -129,10 +129,10 @@ export function makeAnalysis(deps: {
   const { analysisRepo, storyRepo, ai } = deps;
 
   async function analyzeStory(storyId: number): Promise<boolean> {
-    const story = storyRepo.findById(storyId);
+    const story = await storyRepo.findById(storyId);
     if (!story) return false;
 
-    const articles = analysisRepo.findArticlesByStory(storyId);
+    const articles = await analysisRepo.findArticlesByStory(storyId);
     if (articles.length === 0) return false;
 
     let method: "ai" | "heuristic" = "heuristic";
@@ -206,7 +206,7 @@ export function makeAnalysis(deps: {
       blindspot = h.blindspot;
     }
 
-    analysisRepo.upsert({
+    await analysisRepo.upsert({
       story_id: storyId,
       neutral_summary,
       facts,
@@ -224,7 +224,7 @@ export function makeAnalysis(deps: {
     analyzeStory,
 
     async analyzeTopStories(limit = 8): Promise<number> {
-      const stale = analysisRepo.findStaleStoryIds(limit);
+      const stale = await analysisRepo.findStaleStoryIds(limit);
       let done = 0;
 
       // Worker pool sederhana: maks AI_CONCURRENCY analisis bersamaan

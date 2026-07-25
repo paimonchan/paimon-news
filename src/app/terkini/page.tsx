@@ -17,7 +17,7 @@ export default async function TerkiniPage({
 }) {
   const { page: pageStr } = await searchParams;
   const page = Math.max(1, Number(pageStr) || 1);
-  const { articles, total } = getContainer().queries.getLatestArticles(page);
+  const { articles, total } = await getContainer().queries.getLatestArticles(page);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-6">

@@ -30,7 +30,7 @@ export default async function CategoryPage({
 
   const { page: pageStr } = await searchParams;
   const page = Math.max(1, Number(pageStr) || 1);
-  const { stories, total } = getContainer().queries.getTopStories(page, PER_PAGE, slug);
+  const { stories, total } = await getContainer().queries.getTopStories(page, PER_PAGE, slug);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-6">

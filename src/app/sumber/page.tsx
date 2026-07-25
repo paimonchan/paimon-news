@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Daftar Sumber" };
 
 export default async function SumberPage() {
-  const sources = getContainer().queries.getSourcesWithStats();
+  const sources = await getContainer().queries.getSourcesWithStats();
   const totalArticles = sources.reduce((acc, s) => acc + s.article_count, 0);
 
   return (
@@ -57,9 +57,9 @@ export default async function SumberPage() {
       </div>
 
       <p className="mt-8 text-sm text-stone-400">
-        Ingin menambah sumber? Edit daftar di{" "}
+        Ingin menambah sumber?         Edit daftar di{" "}
         <code className="rounded bg-stone-100 px-1.5 py-0.5 text-xs dark:bg-stone-800">
-          src/lib/sources.ts
+          src/infrastructure/db/source-defs.ts
         </code>
         .
       </p>

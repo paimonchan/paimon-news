@@ -108,6 +108,13 @@ cp .env.example .env.local
 
 Tanpa AI key, analisis tetap berjalan pakai heuristic (common-sentence extraction + distinctive-token scoring).
 
+**Variabel opsional — Database:**
+| Variabel | Default | Keterangan |
+|---|---|---|
+| `DATABASE_URL` | — | URL koneksi Postgres (kosongkan untuk SQLite default) |
+
+Tanpa `DATABASE_URL`, Lensa pakai SQLite lokal (`data/lensa.db`). Untuk produksi, set `DATABASE_URL` ke Postgres (Supabase/Neon).
+
 **Variabel opsional — Email:**
 | Variabel | Default | Keterangan |
 |---|---|---|
@@ -149,17 +156,21 @@ vercel --prod
 Set environment variables di dashboard Vercel (lihat `.env.example`).
 
 **Catatan:**
-- SQLite bersifat ephemeral di Vercel (data hilang tiap redeploy). Untuk produksi serius, migrasikan ke Postgres (Supabase/Neon) — skema sudah kompatibel.
+- SQLite bersifat ephemeral di Vercel (data hilang tiap redeploy). Untuk produksi serius, set `DATABASE_URL` ke Postgres (Supabase/Neon).
 - Vercel Hobby hanya mengizinkan cron harian. Untuk interval lebih sering, gunakan scheduler eksternal (cron-job.org, GitHub Actions) yang memanggil:
   ```
   curl -H "Authorization: Bearer $CRON_SECRET" https://domainmu/api/cron/ingest
   ```
 
-### PostgreSQL Migration Path
+### PostgreSQL
 
-1. Buat database di Supabase/Neon
-2. Ganti implementasi `src/infrastructure/db/` dari better-sqlite3 ke `@vercel/postgres` atau `pg`
-3. Interface di `src/application/ports.ts` tetap sama — clean architecture menjamin zero perubahan di domain/application layer
+Set `DATABASE_URL` ke connection string Postgres. Secara otomatis:
+1. Pool koneksi dibuat via `pg` (node-postgres)
+2. Schema + migrasi dijalankan (tabel `_migrations` tracking)
+3. Seed 11 sumber + 28 feed
+4. Semua repository & query menggunakan adapter Postgres yang menerjemahkan SQL SQLite ke Postgres secara transparan
+
+Semua fitur identik antara SQLite dan Postgres — port interface (`src/application/ports.ts`) tidak berubah.
 
 ## Cron
 
@@ -174,7 +185,7 @@ Keduanya dilindungi oleh `CRON_SECRET` (header `Authorization: Bearer <secret>`)
 
 - **Framework**: Next.js 16 (App Router, Turbopack, Server Actions)
 - **Bahasa**: TypeScript
-- **Database**: SQLite via better-sqlite3 (migrasi v1-v3)
+- **Database**: SQLite via better-sqlite3 (default) atau PostgreSQL via `pg` (jika ada `DATABASE_URL`)
 - **UI**: Tailwind CSS v4, next-themes
 - **Testing**: Vitest
 - **AI**: OpenAI-compatible API (opsional, fallback heuristic)
@@ -182,7 +193,7 @@ Keduanya dilindungi oleh `CRON_SECRET` (header `Authorization: Bearer <secret>`)
 
 ## Struktur Data
 
-9 tabel SQLite:
+9 tabel (SQLite / Postgres):
 - `sources` — Portal berita (Detik, CNN, dll.)
 - `feeds` — RSS feed per portal
 - `articles` — Artikel individual dari feed

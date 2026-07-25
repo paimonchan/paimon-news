@@ -1,8 +1,6 @@
-// Composition root — satu-satunya tempat semua dependency dirangkai.
-// App layer (pages/routes/actions) mengimpor use case dari sini, bukan dari infra langsung.
-
 import { config } from "./config";
 import { getDb } from "./db/client";
+import { getPg } from "./db/postgres/client";
 import {
   makeAnalysisRepository,
   makeArticleRepository,
@@ -25,9 +23,8 @@ import { fetchFeed } from "./rss/fetcher";
 import { sendMail } from "./mail/sender";
 
 function build() {
-  const db = getDb();
+  const db = config.databaseUrl ? getPg() : getDb();
 
-  // repositories (infrastructure)
   const feedRepo = makeFeedRepository(db);
   const articleRepo = makeArticleRepository(db);
   const storyRepo = makeStoryRepository(db);
@@ -36,7 +33,6 @@ function build() {
   const bookmarkRepo = makeBookmarkRepository(db);
   const digestRepo = makeDigestRepository(db);
 
-  // ports → implementasi
   const mailer = { send: sendMail };
   const aiClient = {
     chatJson,
@@ -44,9 +40,7 @@ function build() {
     model: () => config.ai.model,
   };
 
-  // use cases (application)
-  const transact = (fn: () => void) => db.transaction(fn)();
-  const clustering = makeClustering({ articleRepo, storyRepo, transact });
+  const clustering = makeClustering({ articleRepo, storyRepo });
   const analysis = makeAnalysis({ analysisRepo, storyRepo, ai: aiClient });
   const cleanup = makeCleanup({
     articleRepo,
@@ -87,7 +81,6 @@ function build() {
 
 export type Container = ReturnType<typeof build>;
 
-// Singleton per proses (aman untuk hot-reload via globalThis).
 const globalForContainer = globalThis as unknown as { __lensaContainer?: Container };
 
 export function getContainer(): Container {

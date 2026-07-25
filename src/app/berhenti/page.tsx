@@ -15,7 +15,7 @@ export default async function BerhentiPage({
 
   let status: "ok" | "invalid" | "none" = "none";
   if (token) {
-    const changes = getContainer().repos.digestRepo.deactivateByToken(token);
+    const changes = await getContainer().repos.digestRepo.deactivateByToken(token);
     status = changes > 0 ? "ok" : "invalid";
   }
 

@@ -5,7 +5,7 @@ import { CATEGORIES } from "@/domain/categorize";
 
 export const dynamic = "force-dynamic";
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = config.baseUrl;
 
   const staticRoutes: MetadataRoute.Sitemap = [
@@ -21,7 +21,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: path === "" ? 1 : 0.7,
   }));
 
-  const { stories } = getContainer().queries.getTopStories(1, 50);
+  const { stories } = await getContainer().queries.getTopStories(1, 50);
   const storyRoutes: MetadataRoute.Sitemap = stories.map((s) => ({
     url: `${base}/story/${s.id}`,
     lastModified: new Date(s.updated_at),

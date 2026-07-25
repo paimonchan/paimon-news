@@ -11,7 +11,6 @@ import {
 import type { NewArticle } from "@/domain/entities";
 import crypto from "node:crypto";
 
-/** Rangkai semua repository di atas DB in-memory yang sudah dimigrasi. */
 export function makeTestRepos() {
   const db = openDb(":memory:");
   return {
@@ -26,8 +25,9 @@ export function makeTestRepos() {
   };
 }
 
-export function firstSourceId(db: ReturnType<typeof openDb>): number {
-  return (db.prepare("SELECT id FROM sources ORDER BY id LIMIT 1").get() as { id: number }).id;
+export async function firstSourceId(db: ReturnType<typeof openDb>): Promise<number> {
+  const row = await db.get<{ id: number }>("SELECT id FROM sources ORDER BY id LIMIT 1");
+  return row!.id;
 }
 
 export function makeArticle(overrides: Partial<NewArticle> & { source_id: number }): NewArticle {

@@ -1,6 +1,3 @@
-// Ports — kontrak antara application layer dan infrastructure.
-// Application hanya bergantung pada interface ini, bukan pada SQLite/Resend/OpenAI langsung.
-
 import type {
   AnalysisRow,
   AnalysisUpsert,
@@ -15,32 +12,32 @@ import type { FetchFeedResult } from "@/infrastructure/rss/fetcher";
 import type { MailOptions } from "@/infrastructure/mail/sender";
 
 export interface FeedRepository {
-  listActive(): FeedRow[];
-  listActiveBatch(offset: number, limit: number): FeedRow[];
-  markSuccess(id: number, conditional: { etag: string | null; lastModified: string | null }): void;
-  markNotModified(id: number): void;
-  markFailure(id: number): void;
+  listActive(): Promise<FeedRow[]>;
+  listActiveBatch(offset: number, limit: number): Promise<FeedRow[]>;
+  markSuccess(id: number, conditional: { etag: string | null; lastModified: string | null }): Promise<void>;
+  markNotModified(id: number): Promise<void>;
+  markFailure(id: number): Promise<void>;
 }
 
 export interface ArticleRepository {
-  insertIgnore(article: NewArticle): number;
-  findUnassignedSince(hoursBack: number): ArticleRow[];
-  deleteOlderThanDays(days: number): number;
+  insertIgnore(article: NewArticle): Promise<number>;
+  findUnassignedSince(hoursBack: number): Promise<ArticleRow[]>;
+  deleteOlderThanDays(days: number): Promise<number>;
 }
 
 export interface StoryRepository {
-  findRecent(hoursBack: number): StoryRow[];
-  insert(title: string, category: string, at: string, tokensJson: string): number;
-  linkArticle(storyId: number, articleId: number, similarity: number): void;
-  recount(storyId: number): void;
-  updateTokens(storyId: number, tokensJson: string): void;
-  reassignLinks(fromStoryId: number, toStoryId: number): void;
-  moveAnalysisIfAbsent(fromStoryId: number, toStoryId: number): void;
-  delete(storyId: number): void;
-  listForHotRefresh(hoursBack: number): Pick<StoryRow, "id" | "article_count" | "source_count" | "updated_at">[];
-  updateHotScore(storyId: number, score: number): void;
-  deleteOrphans(): number;
-  findById(storyId: number): StoryRow | undefined;
+  findRecent(hoursBack: number): Promise<StoryRow[]>;
+  insert(title: string, category: string, at: string, tokensJson: string): Promise<number>;
+  linkArticle(storyId: number, articleId: number, similarity: number): Promise<void>;
+  recount(storyId: number): Promise<void>;
+  updateTokens(storyId: number, tokensJson: string): Promise<void>;
+  reassignLinks(fromStoryId: number, toStoryId: number): Promise<void>;
+  moveAnalysisIfAbsent(fromStoryId: number, toStoryId: number): Promise<void>;
+  delete(storyId: number): Promise<void>;
+  listForHotRefresh(hoursBack: number): Promise<Pick<StoryRow, "id" | "article_count" | "source_count" | "updated_at">[]>;
+  updateHotScore(storyId: number, score: number): Promise<void>;
+  deleteOrphans(): Promise<number>;
+  findById(storyId: number): Promise<StoryRow | undefined>;
 }
 
 export interface ArticleWithSource extends ArticleRow {
@@ -50,32 +47,30 @@ export interface ArticleWithSource extends ArticleRow {
 }
 
 export interface AnalysisRepository {
-  get(storyId: number): AnalysisRow | undefined;
-  upsert(analysis: AnalysisUpsert): void;
-  findStaleStoryIds(limit: number): number[];
-  findArticlesByStory(storyId: number): ArticleWithSource[];
+  get(storyId: number): Promise<AnalysisRow | undefined>;
+  upsert(analysis: AnalysisUpsert): Promise<void>;
+  findStaleStoryIds(limit: number): Promise<number[]>;
+  findArticlesByStory(storyId: number): Promise<ArticleWithSource[]>;
 }
 
 export interface AuthRepository {
-  countRecentTokens(email: string, withinHours: number): number;
-  createToken(token: string, email: string, expiresInMinutes: number): void;
-  /** Atomik: tandai token terpakai + upsert user + buat sesi. Null jika token invalid. */
-  consumeTokenAndCreateSession(token: string, sessionToken: string, sessionDays: number): string | null;
-  findUserBySession(sessionToken: string): UserRow | null;
-  deleteSession(sessionToken: string): void;
-  purgeExpired(): { tokens: number; sessions: number };
+  countRecentTokens(email: string, withinHours: number): Promise<number>;
+  createToken(token: string, email: string, expiresInMinutes: number): Promise<void>;
+  consumeTokenAndCreateSession(token: string, sessionToken: string, sessionDays: number): Promise<string | null>;
+  findUserBySession(sessionToken: string): Promise<UserRow | null>;
+  deleteSession(sessionToken: string): Promise<void>;
+  purgeExpired(): Promise<{ tokens: number; sessions: number }>;
 }
 
 export interface BookmarkRepository {
-  isBookmarked(userId: number, storyId: number): boolean;
-  /** Toggle; mengembalikan status baru (true = tersimpan). */
-  toggle(userId: number, storyId: number): boolean;
+  isBookmarked(userId: number, storyId: number): Promise<boolean>;
+  toggle(userId: number, storyId: number): Promise<boolean>;
 }
 
 export interface DigestRepository {
-  upsertSubscription(email: string, userId: number | null, unsubscribeToken: string): void;
-  deactivateByToken(token: string): number;
-  listActive(): { email: string; unsubscribe_token: string }[];
+  upsertSubscription(email: string, userId: number | null, unsubscribeToken: string): Promise<void>;
+  deactivateByToken(token: string): Promise<number>;
+  listActive(): Promise<{ email: string; unsubscribe_token: string }[]>;
 }
 
 export type Mailer = { send(opts: MailOptions): Promise<{ sent: boolean }> };

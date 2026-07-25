@@ -12,7 +12,7 @@ export function makeSessionService(authRepo: AuthRepository, sessionDays: number
       const store = await cookies();
       const token = store.get(SESSION_COOKIE)?.value;
       if (!token) return null;
-      return authRepo.findUserBySession(token);
+      return await authRepo.findUserBySession(token);
     },
 
     async setSessionCookie(sessionToken: string): Promise<void> {
@@ -29,7 +29,7 @@ export function makeSessionService(authRepo: AuthRepository, sessionDays: number
     async destroySession(): Promise<void> {
       const store = await cookies();
       const token = store.get(SESSION_COOKIE)?.value;
-      if (token) authRepo.deleteSession(token);
+      if (token) await authRepo.deleteSession(token);
       store.delete(SESSION_COOKIE);
     },
   };

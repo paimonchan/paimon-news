@@ -29,30 +29,27 @@ function withTokens(story: StoryRow): StoryWithTokens {
 }
 
 export interface ClusteringUseCase {
-  assignNewArticles(): { assigned: number; created: number };
-  mergeSimilarStories(): number;
-  refreshHotScores(): void;
+  assignNewArticles(): Promise<{ assigned: number; created: number }>;
+  mergeSimilarStories(): Promise<number>;
+  refreshHotScores(): Promise<void>;
 }
 
 export function makeClustering(deps: {
   articleRepo: ArticleRepository;
   storyRepo: StoryRepository;
-  /** Opsional, untuk test: transaksi dijalankan di repository container. */
-  transact?: (fn: () => void) => void;
 }): ClusteringUseCase {
   const { articleRepo, storyRepo } = deps;
-  const transact = deps.transact ?? ((fn: () => void) => fn());
 
-  function loadRecentStories(): StoryWithTokens[] {
-    return storyRepo.findRecent(STORY_WINDOW_HOURS).map(withTokens);
+  async function loadRecentStories(): Promise<StoryWithTokens[]> {
+    return (await storyRepo.findRecent(STORY_WINDOW_HOURS)).map(withTokens);
   }
 
   return {
-    assignNewArticles() {
-      const articles = articleRepo.findUnassignedSince(ARTICLE_WINDOW_HOURS);
+    async assignNewArticles() {
+      const articles = await articleRepo.findUnassignedSince(ARTICLE_WINDOW_HOURS);
       if (articles.length === 0) return { assigned: 0, created: 0 };
 
-      const stories = loadRecentStories();
+      const stories = await loadRecentStories();
 
       // Inverted index: token -> indeks story (kandidat tanpa O(n*m) penuh)
       const tokenIndex = new Map<string, number[]>();
@@ -67,76 +64,74 @@ export function makeClustering(deps: {
       let assigned = 0;
       let created = 0;
 
-      transact(() => {
-        for (const article of articles) {
-          const tokens = new Set((article.title_tokens ?? "").split(" ").filter(Boolean));
-          if (tokens.size === 0) continue;
+      for (const article of articles) {
+        const tokens = new Set((article.title_tokens ?? "").split(" ").filter(Boolean));
+        if (tokens.size === 0) continue;
 
-          const candidateIdx = new Set<number>();
-          for (const t of tokens) {
-            for (const i of tokenIndex.get(t) ?? []) candidateIdx.add(i);
-          }
+        const candidateIdx = new Set<number>();
+        for (const t of tokens) {
+          for (const i of tokenIndex.get(t) ?? []) candidateIdx.add(i);
+        }
 
-          let best: StoryWithTokens | null = null;
-          let bestScore = 0;
-          for (const i of candidateIdx) {
-            const s = stories[i];
-            let score = overlapCoefficient(tokens, s.tokenSet);
-            if (s.category === article.category) score += SAME_CATEGORY_BONUS;
-            if (score > bestScore) {
-              bestScore = score;
-              best = s;
-            }
-          }
-
-          if (best && bestScore >= ATTACH_THRESHOLD) {
-            storyRepo.linkArticle(best.id, article.id, Math.min(bestScore, 1));
-            storyRepo.recount(best.id);
-            const newMap = mergeTokens(parseTokenMap(best.tokens_json), tokens);
-            storyRepo.updateTokens(best.id, JSON.stringify(newMap));
-            best.tokens_json = JSON.stringify(newMap);
-            best.tokenSet = new Set(Object.keys(newMap));
-            assigned++;
-          } else {
-            const now = article.published_at ?? new Date().toISOString();
-            const tokenMap: TokenMap = Object.fromEntries([...tokens].map((t) => [t, 1]));
-            const storyId = storyRepo.insert(
-              article.title,
-              article.category,
-              now,
-              JSON.stringify(tokenMap)
-            );
-            storyRepo.linkArticle(storyId, article.id, 1);
-            storyRepo.recount(storyId);
-
-            const fresh: StoryWithTokens = {
-              id: storyId,
-              title: article.title,
-              category: article.category,
-              created_at: now,
-              updated_at: now,
-              article_count: 1,
-              source_count: 1,
-              hot_score: 0,
-              tokens_json: JSON.stringify(tokenMap),
-              tokenSet: tokens,
-            };
-            const idx = stories.push(fresh) - 1;
-            for (const t of tokens) {
-              const list = tokenIndex.get(t);
-              if (list) list.push(idx);
-              else tokenIndex.set(t, [idx]);
-            }
-            created++;
+        let best: StoryWithTokens | null = null;
+        let bestScore = 0;
+        for (const i of candidateIdx) {
+          const s = stories[i];
+          let score = overlapCoefficient(tokens, s.tokenSet);
+          if (s.category === article.category) score += SAME_CATEGORY_BONUS;
+          if (score > bestScore) {
+            bestScore = score;
+            best = s;
           }
         }
-      });
+
+        if (best && bestScore >= ATTACH_THRESHOLD) {
+          await storyRepo.linkArticle(best.id, article.id, Math.min(bestScore, 1));
+          await storyRepo.recount(best.id);
+          const newMap = mergeTokens(parseTokenMap(best.tokens_json), tokens);
+          await storyRepo.updateTokens(best.id, JSON.stringify(newMap));
+          best.tokens_json = JSON.stringify(newMap);
+          best.tokenSet = new Set(Object.keys(newMap));
+          assigned++;
+        } else {
+          const now = article.published_at ?? new Date().toISOString();
+          const tokenMap: TokenMap = Object.fromEntries([...tokens].map((t) => [t, 1]));
+          const storyId = await storyRepo.insert(
+            article.title,
+            article.category,
+            now,
+            JSON.stringify(tokenMap)
+          );
+          await storyRepo.linkArticle(storyId, article.id, 1);
+          await storyRepo.recount(storyId);
+
+          const fresh: StoryWithTokens = {
+            id: storyId,
+            title: article.title,
+            category: article.category,
+            created_at: now,
+            updated_at: now,
+            article_count: 1,
+            source_count: 1,
+            hot_score: 0,
+            tokens_json: JSON.stringify(tokenMap),
+            tokenSet: tokens,
+          };
+          const idx = stories.push(fresh) - 1;
+          for (const t of tokens) {
+            const list = tokenIndex.get(t);
+            if (list) list.push(idx);
+            else tokenIndex.set(t, [idx]);
+          }
+          created++;
+        }
+      }
 
       return { assigned, created };
     },
 
-    mergeSimilarStories() {
-      const stories = loadRecentStories().filter((s) => s.article_count > 0);
+    async mergeSimilarStories() {
+      const stories = (await loadRecentStories()).filter((s) => s.article_count > 0);
       let merged = 0;
       const consumed = new Set<number>();
 
@@ -166,16 +161,14 @@ export function makeClustering(deps: {
           if (consumed.has(b.id)) continue;
           const sim = overlapCoefficient(a.tokenSet, b.tokenSet);
           if (sim >= MERGE_THRESHOLD) {
-            transact(() => {
-              storyRepo.reassignLinks(b.id, a.id);
-              storyRepo.moveAnalysisIfAbsent(b.id, a.id);
-              storyRepo.delete(b.id);
-              const newMap = mergeTokens(parseTokenMap(a.tokens_json), b.tokenSet);
-              storyRepo.updateTokens(a.id, JSON.stringify(newMap));
-              storyRepo.recount(a.id);
-              a.tokens_json = JSON.stringify(newMap);
-              a.tokenSet = new Set(Object.keys(newMap));
-            });
+            await storyRepo.reassignLinks(b.id, a.id);
+            await storyRepo.moveAnalysisIfAbsent(b.id, a.id);
+            await storyRepo.delete(b.id);
+            const newMap = mergeTokens(parseTokenMap(a.tokens_json), b.tokenSet);
+            await storyRepo.updateTokens(a.id, JSON.stringify(newMap));
+            await storyRepo.recount(a.id);
+            a.tokens_json = JSON.stringify(newMap);
+            a.tokenSet = new Set(Object.keys(newMap));
             consumed.add(b.id);
             merged++;
           }
@@ -184,22 +177,20 @@ export function makeClustering(deps: {
       return merged;
     },
 
-    refreshHotScores() {
-      const stories = storyRepo.listForHotRefresh(72);
+    async refreshHotScores() {
+      const stories = await storyRepo.listForHotRefresh(72);
       const now = Date.now();
-      transact(() => {
-        for (const s of stories) {
-          const ageHours = Math.max(0, (now - new Date(s.updated_at).getTime()) / 3600000);
-          storyRepo.updateHotScore(
-            s.id,
-            hotScore({
-              articleCount: s.article_count,
-              sourceCount: s.source_count,
-              ageHours,
-            })
-          );
-        }
-      });
+      for (const s of stories) {
+        const ageHours = Math.max(0, (now - new Date(s.updated_at).getTime()) / 3600000);
+        await storyRepo.updateHotScore(
+          s.id,
+          hotScore({
+            articleCount: s.article_count,
+            sourceCount: s.source_count,
+            ageHours,
+          })
+        );
+      }
     },
   };
 }

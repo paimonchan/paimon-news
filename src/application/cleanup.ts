@@ -14,14 +14,16 @@ export function makeCleanup(deps: {
   storyRepo: StoryRepository;
   authRepo: AuthRepository;
   articleDays: number;
-}): { run(): CleanupResult } {
+}): { run(): Promise<CleanupResult> } {
   const { articleRepo, storyRepo, authRepo, articleDays } = deps;
 
   return {
-    run(): CleanupResult {
-      const articlesDeleted = articleRepo.deleteOlderThanDays(articleDays);
-      const orphanStoriesDeleted = storyRepo.deleteOrphans();
-      const { tokens, sessions } = authRepo.purgeExpired();
+    async run(): Promise<CleanupResult> {
+      const [articlesDeleted, orphanStoriesDeleted, { tokens, sessions }] = await Promise.all([
+        articleRepo.deleteOlderThanDays(articleDays),
+        storyRepo.deleteOrphans(),
+        authRepo.purgeExpired(),
+      ]);
 
       if (articlesDeleted + orphanStoriesDeleted + tokens + sessions > 0) {
         console.log(
