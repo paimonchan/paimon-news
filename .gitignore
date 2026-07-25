@@ -32,6 +32,10 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
+
+# database lokal Lensa
+/data/
 
 # vercel
 .vercel
@@ -39,3 +43,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# sementara
+test-feeds2.mjs
+
+# log dev server
+data/dev-server.log
+data/dev-server.err.log

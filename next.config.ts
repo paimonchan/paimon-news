@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // better-sqlite3 adalah modul native — jangan di-bundle
+  serverExternalPackages: ["better-sqlite3"],
 };
 
 export default nextConfig;
