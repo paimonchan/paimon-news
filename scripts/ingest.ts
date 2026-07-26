@@ -20,7 +20,7 @@ async function main() {
   console.log("[ingest] DB ready, running ingest...");
 
   const result = await Promise.race([
-    container.ingest.run({ analyze: false }),
+    container.ingest.run({ analyze: true }),
     new Promise<never>((_, reject) => {
       const t = setTimeout(() => reject(new Error("TIMEOUT: ingest > 600 detik")), 600_000);
       t.unref();
