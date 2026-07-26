@@ -78,8 +78,12 @@ export async function chatJson<T>(messages: ChatMessage[]): Promise<AiResult<T> 
     content = content.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
     content = extractJson(content);
 
+    const parsed: T = JSON.parse(content);
+    const isArr = Array.isArray(parsed);
+    console.log("[ai] parsed type:", isArr ? "array[" + parsed.length + "]" : typeof parsed, isArr && parsed.length > 0 ? "keys:" + Object.keys(parsed[0]).join(",") : "");
+
     return {
-      data: JSON.parse(content) as T,
+      data: parsed,
       usage: {
         inputTokens: body.usage?.prompt_tokens ?? null,
         outputTokens: body.usage?.completion_tokens ?? null,
