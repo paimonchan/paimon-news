@@ -96,7 +96,9 @@ export function makeIngest(deps: {
 }): { run(options?: IngestOptions): Promise<FullIngestResult> } {
   const { feedRepo, articleRepo, fetcher, clustering, analysis, cleanup } = deps;
 
-  async function fetchOne(feed: FeedRow): Promise<{ added: number; skipped304: boolean; error?: string }> {
+  type FeedResult = { feedId: number; added: number; skipped304: boolean; success?: { etag: string | null; lastModified: string | null }; error?: string };
+
+  async function fetchOne(feed: FeedRow): Promise<FeedResult> {
     try {
       const result = await fetcher(feed.url, {
         etag: feed.etag,
@@ -104,19 +106,16 @@ export function makeIngest(deps: {
       });
 
       if (result.status === 304) {
-        await feedRepo.markNotModified(feed.id);
-        return { added: 0, skipped304: true };
+        return { feedId: feed.id, added: 0, skipped304: true };
       }
 
       const articles = result.items.map((item) => mapItemToArticle(item, feed)).filter(Boolean) as NewArticle[];
       const added = articles.length > 0 ? await articleRepo.bulkInsertIgnore(articles) : 0;
 
-      await feedRepo.markSuccess(feed.id, { etag: result.etag, lastModified: result.lastModified });
-      return { added, skipped304: false };
+      return { feedId: feed.id, added, skipped304: false, success: { etag: result.etag, lastModified: result.lastModified } };
     } catch (err) {
-      await feedRepo.markFailure(feed.id);
       const message = err instanceof Error ? err.message : String(err);
-      return { added: 0, skipped304: false, error: `Feed #${feed.id} (${feed.url}): ${message}` };
+      return { feedId: feed.id, added: 0, skipped304: false, error: `Feed #${feed.id} (${feed.url}): ${message}` };
     }
   }
 
@@ -138,6 +137,10 @@ export function makeIngest(deps: {
         errors: [],
       };
 
+      const okFeeds: { id: number; etag: string | null; lastModified: string | null }[] = [];
+      const notModifiedIds: number[] = [];
+      const failedIds: number[] = [];
+
       for (let i = 0; i < feeds.length; i += FETCH_CONCURRENCY) {
         const batch = feeds.slice(i, i + FETCH_CONCURRENCY);
         const settled = await Promise.all(batch.map(fetchOne));
@@ -146,14 +149,24 @@ export function makeIngest(deps: {
           if (r.error) {
             result.feedsFailed++;
             result.errors.push(r.error);
+            failedIds.push(r.feedId);
           } else if (r.skipped304) {
             result.feedsSkipped304++;
+            notModifiedIds.push(r.feedId);
           } else {
             result.feedsOk++;
+            okFeeds.push({ id: r.feedId, etag: r.success?.etag ?? null, lastModified: r.success?.lastModified ?? null });
           }
         }
         console.log(`[ingest] batch ${i / FETCH_CONCURRENCY + 1}/${Math.ceil(feeds.length / FETCH_CONCURRENCY)} — feeds ok=${result.feedsOk} skip=${result.feedsSkipped304} fail=${result.feedsFailed} new=${result.articlesNew}`);
       }
+
+      // Batch UPDATE status feed — 3 query total
+      await Promise.all([
+        feedRepo.bulkMarkSuccess(okFeeds),
+        feedRepo.bulkMarkNotModified(notModifiedIds),
+        feedRepo.bulkMarkFailure(failedIds),
+      ]);
 
       console.log("[ingest] meng-cluster artikel...");
       const clusterStats = await clustering.assignNewArticles();

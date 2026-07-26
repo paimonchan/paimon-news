@@ -51,6 +51,43 @@ export function makeFeedRepository(db: Queryable): FeedRepository {
       );
       await db.run("UPDATE feeds SET active = 0 WHERE id = ? AND error_count >= 10", id);
     },
+
+    bulkMarkSuccess: async (items) => {
+      if (items.length === 0) return;
+      const ph = items.map(() => "(?::int, ?::text, ?::text)").join(", ");
+      const vals = items.flatMap((i) => [i.id, i.etag, i.lastModified]);
+      await db.run(
+        `UPDATE feeds SET
+           last_fetched_at = NOW(), last_status = 200, error_count = 0,
+           etag = COALESCE(mp.etag, feeds.etag),
+           last_modified = COALESCE(mp.last_modified, feeds.last_modified)
+         FROM (VALUES ${ph}) AS mp(id, etag, last_modified)
+         WHERE feeds.id = mp.id`,
+        ...vals
+      );
+    },
+
+    bulkMarkNotModified: async (ids) => {
+      if (ids.length === 0) return;
+      const ph = ids.map(() => "?").join(", ");
+      await db.run(
+        `UPDATE feeds SET last_fetched_at = NOW(), last_status = 304, error_count = 0 WHERE id IN (${ph})`,
+        ...ids
+      );
+    },
+
+    bulkMarkFailure: async (ids) => {
+      if (ids.length === 0) return;
+      const ph = ids.map(() => "?").join(", ");
+      await db.run(
+        `UPDATE feeds SET last_fetched_at = NOW(), last_status = 500, error_count = error_count + 1 WHERE id IN (${ph})`,
+        ...ids
+      );
+      await db.run(
+        `UPDATE feeds SET active = 0 WHERE id IN (${ph}) AND error_count >= 10`,
+        ...ids
+      );
+    },
   };
 }
 

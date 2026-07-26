@@ -17,6 +17,9 @@ export interface FeedRepository {
   markSuccess(id: number, conditional: { etag: string | null; lastModified: string | null }): Promise<void>;
   markNotModified(id: number): Promise<void>;
   markFailure(id: number): Promise<void>;
+  bulkMarkSuccess(items: { id: number; etag: string | null; lastModified: string | null }[]): Promise<void>;
+  bulkMarkNotModified(ids: number[]): Promise<void>;
+  bulkMarkFailure(ids: number[]): Promise<void>;
 }
 
 export interface ArticleRepository {
