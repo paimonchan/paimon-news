@@ -1,3 +1,4 @@
+import { waitForPg } from "@/infrastructure/db/postgres/client";
 import { getContainer } from "@/infrastructure/container";
 
 export const dynamic = "force-dynamic";
@@ -5,6 +6,7 @@ export const runtime = "nodejs";
 
 export async function GET() {
   try {
+    await waitForPg();
     const db = getContainer().db;
     await db.get("SELECT 1");
     return Response.json({ status: "ok", db: "connected" });

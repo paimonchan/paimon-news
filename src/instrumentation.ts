@@ -3,6 +3,10 @@ export async function register() {
   if (!process.env.DATABASE_URL) return;
 
   try {
+    const { waitForPg } = await import("@/infrastructure/db/postgres/client");
+    await waitForPg();
+    console.log("[boot] Database ready");
+
     const { getContainer } = await import("@/infrastructure/container");
     const container = getContainer();
 
