@@ -166,8 +166,14 @@ export function makeStoryRepository(db: Queryable): StoryRepository {
     },
 
     reassignLinks: async (fromStoryId, toStoryId) => {
+      // Hapus dulu link yg bentrok, baru pindahkan sisanya
       await db.run(
-        "UPDATE OR IGNORE story_articles SET story_id = ? WHERE story_id = ?",
+        "DELETE FROM story_articles WHERE story_id = ? AND article_id IN (SELECT article_id FROM story_articles WHERE story_id = ?)",
+        toStoryId,
+        fromStoryId
+      );
+      await db.run(
+        "UPDATE story_articles SET story_id = ? WHERE story_id = ?",
         toStoryId,
         fromStoryId
       );
