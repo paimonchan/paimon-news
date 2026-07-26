@@ -1,0 +1,21 @@
+name: Test DB Connection
+on: workflow_dispatch
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: |
+          node -e "
+          const { Client } = require('pg');
+          const client = new Client({ connectionString: process.env.DATABASE_URL, connectionTimeoutMillis: 15000 });
+          client.connect().then(() => client.query('SELECT 1 as ok').then(r => { console.log('OK:', JSON.stringify(r.rows)); process.exit(0); })).catch(e => { console.error('FAIL:', e.message); process.exit(1); });
+          "
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
