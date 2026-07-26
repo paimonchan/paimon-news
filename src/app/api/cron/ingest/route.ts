@@ -3,6 +3,7 @@ import { getContainer } from "@/infrastructure/container";
 import { cronAuthorized } from "../_auth";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 // Batas durasi function (Vercel: sesuaikan plan; lokal/VPS tidak berpengaruh)
 export const maxDuration = 60;
 
