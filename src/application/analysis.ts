@@ -170,7 +170,7 @@ export function makeAnalysis(deps: {
       model = ai.model();
       inputTokens = aiResult.usage.inputTokens;
       outputTokens = aiResult.usage.outputTokens;
-      neutral_summary = parsed.neutral_summary;
+      neutral_summary = parsed.neutral_summary ?? "";
       facts = (parsed.facts ?? []).slice(0, 6);
       blindspot = parsed.blindspot ?? "";
 
@@ -229,7 +229,7 @@ export function makeAnalysis(deps: {
     const articles = await analysisRepo.findArticlesByStory(storyId);
     if (articles.length === 0) return false;
 
-    let aiResult: { data?: AiAnalysisPayload } | null = null;
+    let aiResult: AiResult<AiAnalysisPayload> | null = null;
     if (ai.configured()) {
       const perSource = onePerSource(articles).slice(0, 10);
       const payload = perSource.map((a) => ({

@@ -40,7 +40,10 @@ function extractJson(raw: string): string {
 }
 
 export async function chatJson<T>(messages: ChatMessage[]): Promise<AiResult<T> | null> {
-  if (!config.ai.configured) return null;
+  if (!config.ai.configured) {
+    console.log("[ai] SKIP: configured=" + config.ai.configured + " key=" + (config.ai.apiKey ? "set" : "unset") + " model=" + config.ai.model);
+    return null;
+  }
 
   try {
     const res = await fetch(`${config.ai.baseUrl}/chat/completions`, {
