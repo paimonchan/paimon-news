@@ -1,13 +1,13 @@
 // Kebijakan clustering & ranking — angka-angka inti produk ada di sini agar mudah dituning & ditest.
 
 /** Threshold kemiripan untuk memasang artikel ke story yang sudah ada. */
-export const ATTACH_THRESHOLD = 0.55;
+export const ATTACH_THRESHOLD = 0.35;
 
 /** Threshold kemiripan untuk menggabungkan dua story. */
-export const MERGE_THRESHOLD = 0.6;
+export const MERGE_THRESHOLD = 0.4;
 
 /** Bonus skor jika kategori artikel sama dengan story. */
-export const SAME_CATEGORY_BONUS = 0.08;
+export const SAME_CATEGORY_BONUS = 0.12;
 
 /** Story hanya menerima artikel baru dalam jendela waktu ini (jam). 0 = semua. */
 export const STORY_WINDOW_HOURS = 0;
