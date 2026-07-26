@@ -31,6 +31,7 @@ export async function chatJson<T>(messages: ChatMessage[]): Promise<AiResult<T> 
       body: JSON.stringify({
         model: config.ai.model,
         messages,
+        response_format: { type: "json_object" },
         temperature: 0.3,
       }),
       signal: AbortSignal.timeout(45000),
