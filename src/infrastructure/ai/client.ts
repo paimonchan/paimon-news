@@ -68,7 +68,11 @@ export async function chatJson<T>(messages: ChatMessage[]): Promise<AiResult<T> 
 
     const body = (await res.json()) as ChatCompletionResponse;
     let content = body.choices?.[0]?.message?.content;
-    if (!content) return null;
+    console.log("[ai] RAW content length:", content?.length ?? 0, "preview:", (content ?? "").slice(0, 120));
+    if (!content) {
+      console.log("[ai] empty content — finish_reason:", body.choices?.[0]?.finish_reason);
+      return null;
+    }
 
     // Bersihkan code fences & teks luar JSON
     content = content.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
