@@ -46,8 +46,15 @@ export async function chatJson<T>(messages: ChatMessage[]): Promise<AiResult<T> 
     let content = body.choices?.[0]?.message?.content;
     if (!content) return null;
 
-    // Bersihkan code fences (```json ... ``` atau ``` ... ```) — beberapa model (Gemini, Ollama) suka bungkus JSON
+    // Bersihkan code fences (```json ... ``` atau ``` ... ```)
     content = content.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
+
+    // Cari JSON object pertama (beberapa model sisipkan teks setelah JSON)
+    const firstBrace = content.indexOf("{");
+    const lastBrace = content.lastIndexOf("}");
+    if (firstBrace !== -1 && lastBrace > firstBrace) {
+      content = content.slice(firstBrace, lastBrace + 1);
+    }
 
     return {
       data: JSON.parse(content) as T,
