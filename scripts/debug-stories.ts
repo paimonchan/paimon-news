@@ -59,32 +59,58 @@ async function main() {
     console.log(`  #${r.id} [${r.category}] ${r.title.slice(0, 100)} (${r.article_count} artikel, ${r.source_count} sumber, hot=${r.hot_score})`);
   }
 
+  console.log("\n=== CEK KOLOM articles ===");
+  const cols = await pool.query(`
+    SELECT column_name FROM information_schema.columns
+    WHERE table_name = 'articles' ORDER BY ordinal_position
+  `);
+  console.log(`  kolom: ${cols.rows.map(r => r.column_name).join(", ")}`);
+
   console.log("\n=== ARTIKEL TERTUA YANG BELUM MASUK STORY ===");
   const unassigned = await pool.query(`
-    SELECT COUNT(*) AS cnt FROM articles WHERE story_id IS NULL
+    SELECT COUNT(*) AS cnt FROM articles a
+    LEFT JOIN story_articles sa ON sa.article_id = a.id
+    WHERE sa.story_id IS NULL
   `);
   console.log(`  ${unassigned.rows[0].cnt} artikel tanpa story`);
 
   if (Number(unassigned.rows[0].cnt) > 0) {
     const sample = await pool.query(`
-      SELECT id, title, source_id, published_at, category
-      FROM articles WHERE story_id IS NULL
-      ORDER BY published_at DESC LIMIT 5
+      SELECT a.id, a.title, a.source_id, a.published_at, a.category
+      FROM articles a
+      LEFT JOIN story_articles sa ON sa.article_id = a.id
+      WHERE sa.story_id IS NULL
+      ORDER BY a.published_at DESC LIMIT 5
     `);
     for (const r of sample.rows) {
       console.log(`  #${r.id} [src=${r.source_id}] ${r.title.slice(0, 100)}`);
     }
   }
 
-  console.log("\n=== TOTAL ARTICLES ===");
-  const tot = await pool.query("SELECT COUNT(*) FROM articles");
-  console.log(`  ${tot.rows[0].count} total artikel`);
-
-  console.log("\n=== CURRENT OVERLAP THRESHOLDS ===");
-  console.log(`  ATTACH_THRESHOLD = 0.55 (artikel → story)`);
-  console.log(`  MERGE_THRESHOLD  = 0.60 (story → story)`);
-  console.log(`  CATEGORY_BONUS   = 0.08`);
-  console.log(`  MAX_STORY_TOKENS = 40`);
+  console.log("\n=== SAMPLE SINGLETONS — cek judul mirip (di JS, tanpa pg_trgm) ===");
+  // Ambil 30 singleton terbaru, bandingkan overlap token pairwise
+  const raw = await pool.query(`
+    SELECT s.id, s.title FROM stories s
+    WHERE s.article_count = 1
+    ORDER BY s.hot_score DESC LIMIT 30
+  `);
+  const titles = raw.rows.map((r: any) => ({ id: r.id, tokens: new Set((r.title as string).toLowerCase().split(/\s+/).filter(Boolean)) }));
+  let found = 0;
+  for (let i = 0; i < titles.length && found < 5; i++) {
+    for (let j = i + 1; j < titles.length && found < 5; j++) {
+      const [small, big] = titles[i].tokens.size <= titles[j].tokens.size ? [titles[i], titles[j]] : [titles[j], titles[i]];
+      let inter = 0;
+      for (const t of small.tokens) if (big.tokens.has(t)) inter++;
+      const overlap = inter / small.tokens.size;
+      if (overlap >= 0.3) {
+        console.log(`  overlap=${overlap.toFixed(2)} — #${titles[i].id} vs #${titles[j].id}`);
+        console.log(`    → ${raw.rows.find((r: any) => r.id === titles[i].id)?.title.slice(0, 80)}`);
+        console.log(`    → ${raw.rows.find((r: any) => r.id === titles[j].id)?.title.slice(0, 80)}`);
+        found++;
+      }
+    }
+  }
+  if (found === 0) console.log("  Tidak ada pasangan dengan overlap >= 0.3 di sample 30 ini");
 
   await pool.end();
 }
