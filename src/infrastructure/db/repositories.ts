@@ -102,11 +102,16 @@ export function makeArticleRepository(db: Queryable): ArticleRepository {
 
     findUnassignedSince: (hoursBack) =>
       db.all<ArticleRow>(
-        `SELECT a.* FROM articles a
-         LEFT JOIN story_articles sa ON sa.article_id = a.id
-         WHERE sa.article_id IS NULL
-           AND a.published_at >= datetime('now', '-${Math.floor(hoursBack)} hours')
-         ORDER BY a.published_at ASC`
+        hoursBack > 0
+          ? `SELECT a.* FROM articles a
+             LEFT JOIN story_articles sa ON sa.article_id = a.id
+             WHERE sa.article_id IS NULL
+               AND a.published_at >= datetime('now', '-${Math.floor(hoursBack)} hours')
+             ORDER BY a.published_at ASC`
+          : `SELECT a.* FROM articles a
+             LEFT JOIN story_articles sa ON sa.article_id = a.id
+             WHERE sa.article_id IS NULL
+             ORDER BY a.published_at ASC`
       ),
 
     deleteOlderThanDays: async (days) => {
@@ -121,10 +126,12 @@ export function makeArticleRepository(db: Queryable): ArticleRepository {
 export function makeStoryRepository(db: Queryable): StoryRepository {
   return {
     findRecent: (hoursBack) =>
-      db.all<StoryRow>(
-        `SELECT * FROM stories
-         WHERE updated_at >= datetime('now', '-${Math.floor(hoursBack)} hours')`
-      ),
+      hoursBack > 0
+        ? db.all<StoryRow>(
+            `SELECT * FROM stories
+             WHERE updated_at >= datetime('now', '-${Math.floor(hoursBack)} hours')`
+          )
+        : db.all<StoryRow>("SELECT * FROM stories"),
 
     insert: async (title, category, at, tokensJson) => {
       const result = await db.run(
@@ -208,11 +215,12 @@ export function makeStoryRepository(db: Queryable): StoryRepository {
     },
 
     bulkRefreshHotScores: async (hoursBack) => {
+      const where = hoursBack > 0 ? `WHERE updated_at >= NOW() - INTERVAL '${Math.floor(hoursBack)} hours'` : "";
       const result = await db.run(
         `UPDATE stories SET hot_score =
            source_count * 3 + article_count * 0.8
            + 8 * EXP(-EXTRACT(EPOCH FROM (NOW() - updated_at)) / 36000)
-         WHERE updated_at >= NOW() - INTERVAL '${Math.floor(hoursBack)} hours'`
+         ${where}`
       );
       return result.changes;
     },

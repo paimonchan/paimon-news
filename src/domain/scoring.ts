@@ -9,11 +9,11 @@ export const MERGE_THRESHOLD = 0.6;
 /** Bonus skor jika kategori artikel sama dengan story. */
 export const SAME_CATEGORY_BONUS = 0.08;
 
-/** Story hanya menerima artikel baru dalam jendela waktu ini (jam). */
-export const STORY_WINDOW_HOURS = 48;
+/** Story hanya menerima artikel baru dalam jendela waktu ini (jam). 0 = semua. */
+export const STORY_WINDOW_HOURS = 0;
 
-/** Artikel lebih tua dari ini tidak di-cluster sama sekali (jam). */
-export const ARTICLE_WINDOW_HOURS = 72;
+/** Artikel lebih tua dari ini tidak di-cluster sama sekali (jam). 0 = semua. */
+export const ARTICLE_WINDOW_HOURS = 0;
 
 /** Jumlah token maksimal yang disimpan per story. */
 export const MAX_STORY_TOKENS = 40;
