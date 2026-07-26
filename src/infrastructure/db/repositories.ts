@@ -229,6 +229,19 @@ export function makeStoryRepository(db: Queryable): StoryRepository {
       await db.run("UPDATE stories SET tokens_json = ? WHERE id = ?", tokensJson, storyId);
     },
 
+    bulkUpdateTokens: async (updates) => {
+      if (updates.length === 0) return;
+      const caseWhen = updates.map(() => "WHEN ? THEN ?").join(" ");
+      const vals = updates.flatMap((u) => [u.storyId, u.tokensJson]);
+      const ids = updates.map((u) => u.storyId);
+      const ph = ids.map(() => "?").join(", ");
+      await db.run(
+        `UPDATE stories SET tokens_json = CASE id ${caseWhen} ELSE tokens_json END WHERE id IN (${ph})`,
+        ...vals,
+        ...ids
+      );
+    },
+
     reassignLinks: async (fromStoryId, toStoryId) => {
       // Hapus dulu link yg bentrok, baru pindahkan sisanya
       await db.run(

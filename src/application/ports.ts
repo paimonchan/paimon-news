@@ -48,6 +48,7 @@ export interface StoryRepository {
   recount(storyId: number): Promise<void>;
   bulkRecount(storyIds: number[]): Promise<void>;
   updateTokens(storyId: number, tokensJson: string): Promise<void>;
+  bulkUpdateTokens(updates: { storyId: number; tokensJson: string }[]): Promise<void>;
   reassignLinks(fromStoryId: number, toStoryId: number): Promise<void>;
   bulkReassignLinks(fromStoryIds: number[], toStoryId: number): Promise<void>;
   bulkMerge(merges: { targetId: number; sourceIds: number[]; mergedTokens: string }[]): Promise<void>;

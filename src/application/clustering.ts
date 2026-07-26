@@ -97,6 +97,11 @@ export function makeClustering(deps: {
         }
       });
 
+      // Kumpulkan semua hasil matching di memory dulu — DB nanti sekali
+      const matchedLinks: { story_id: number; article_id: number; similarity: number }[] = [];
+      const storyNewTokens = new Map<number, string>();
+      const newArticleItems: { article: (typeof articles)[0]; tokenMap: TokenMap; tokens: Set<string> }[] = [];
+
       let assigned = 0;
       let created = 0;
 
@@ -122,44 +127,79 @@ export function makeClustering(deps: {
         }
 
         if (best && bestScore >= ATTACH_THRESHOLD) {
-          await storyRepo.linkArticle(best.id, article.id, Math.min(bestScore, 1));
-          await storyRepo.recount(best.id);
-          const newMap = mergeTokens(parseTokenMap(best.tokens_json), tokens);
-          await storyRepo.updateTokens(best.id, JSON.stringify(newMap));
-          best.tokens_json = JSON.stringify(newMap);
+          matchedLinks.push({ story_id: best.id, article_id: article.id, similarity: Math.min(bestScore, 1) });
+          // Merge token in-memory untuk story target
+          const base = storyNewTokens.get(best.id) ?? best.tokens_json ?? "{}";
+          const newMap = mergeTokens(parseTokenMap(base), tokens);
+          const newTokens = JSON.stringify(newMap);
+          storyNewTokens.set(best.id, newTokens);
+          best.tokens_json = newTokens;
           best.tokenSet = new Set(Object.keys(newMap));
           assigned++;
         } else {
-          const now = article.published_at ?? new Date().toISOString();
-          const tokenMap: TokenMap = Object.fromEntries([...tokens].map((t) => [t, 1]));
-          const storyId = await storyRepo.insert(
-            article.title,
-            article.category,
-            now,
-            JSON.stringify(tokenMap)
-          );
-          await storyRepo.linkArticle(storyId, article.id, 1);
-          await storyRepo.recount(storyId);
+          newArticleItems.push({ article, tokenMap: Object.fromEntries([...tokens].map((t) => [t, 1])), tokens });
+          created++;
+        }
+      }
 
+      // Batch writes — total 5-6 query untuk semua artikel
+
+      // 1. Link artikel yg cocok ke story exist
+      if (matchedLinks.length > 0) {
+        await storyRepo.bulkLinkArticles(matchedLinks);
+      }
+
+      // 2. Update recount + tokens untuk story yg nerima artikel baru
+      const affectedStoryIds = [...storyNewTokens.keys()];
+      if (affectedStoryIds.length > 0) {
+        await storyRepo.bulkRecount(affectedStoryIds);
+        await storyRepo.bulkUpdateTokens(
+          affectedStoryIds.map((id) => ({ storyId: id, tokensJson: storyNewTokens.get(id)! }))
+        );
+      }
+
+      // 3. Insert story baru + link artikelnya
+      if (newArticleItems.length > 0) {
+        const storyRows = newArticleItems.map((na) => ({
+          title: na.article.title,
+          category: na.article.category,
+          created_at: na.article.published_at ?? new Date().toISOString(),
+          tokens_json: JSON.stringify(na.tokenMap),
+        }));
+
+        const storyIds = await storyRepo.bulkInsert(storyRows);
+
+        await storyRepo.bulkLinkArticles(
+          newArticleItems.map((na, i) => ({
+            story_id: storyIds[i],
+            article_id: na.article.id,
+            similarity: 1,
+          }))
+        );
+
+        await storyRepo.bulkRecount(storyIds);
+
+        // Update in-memory index untuk story baru
+        for (let i = 0; i < newArticleItems.length; i++) {
+          const na = newArticleItems[i];
           const fresh: StoryWithTokens = {
-            id: storyId,
-            title: article.title,
-            category: article.category,
-            created_at: now,
-            updated_at: now,
+            id: storyIds[i],
+            title: na.article.title,
+            category: na.article.category,
+            created_at: na.article.published_at ?? new Date().toISOString(),
+            updated_at: na.article.published_at ?? new Date().toISOString(),
             article_count: 1,
             source_count: 1,
             hot_score: 0,
-            tokens_json: JSON.stringify(tokenMap),
-            tokenSet: tokens,
+            tokens_json: JSON.stringify(na.tokenMap),
+            tokenSet: na.tokens,
           };
           const idx = stories.push(fresh) - 1;
-          for (const t of tokens) {
+          for (const t of na.tokens) {
             const list = tokenIndex.get(t);
             if (list) list.push(idx);
             else tokenIndex.set(t, [idx]);
           }
-          created++;
         }
       }
 
