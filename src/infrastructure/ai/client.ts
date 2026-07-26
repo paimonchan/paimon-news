@@ -79,8 +79,17 @@ export async function chatJson<T>(messages: ChatMessage[]): Promise<AiResult<T> 
     content = extractJson(content);
 
     const parsed: T = JSON.parse(content);
-    const isArr = Array.isArray(parsed);
-    console.log("[ai] parsed type:", isArr ? "array[" + parsed.length + "]" : typeof parsed, isArr && parsed.length > 0 ? "keys:" + Object.keys(parsed[0]).join(",") : "");
+    if (Array.isArray(parsed)) {
+      console.log("[ai] array[" + parsed.length + "]", parsed.length > 0 ? "keys:" + Object.keys(parsed[0]).join(",") : "");
+    } else if (parsed && typeof parsed === "object") {
+      const keys = Object.keys(parsed as object);
+      console.log("[ai] object keys:", keys.join(","));
+      // Cari properti yang berisi array
+      for (const k of keys) {
+        const v = (parsed as any)[k];
+        if (Array.isArray(v)) console.log("[ai]  " + k + " -> array[" + v.length + "]");
+      }
+    }
 
     return {
       data: parsed,

@@ -288,8 +288,19 @@ export function makeAnalysis(deps: {
     }
 
     const parsedMap = new Map<number, BatchAiPayload>();
-    if (batchResult?.data && Array.isArray(batchResult.data)) {
-      for (const d of batchResult.data) {
+    let arr: BatchAiPayload[] | null = null;
+    if (batchResult?.data) {
+      if (Array.isArray(batchResult.data)) {
+        arr = batchResult.data;
+      } else if (typeof batchResult.data === "object") {
+        // Model kadang bungkus array dalam object (e.g. { stories: [...] })
+        for (const v of Object.values(batchResult.data as object)) {
+          if (Array.isArray(v)) { arr = v as BatchAiPayload[]; break; }
+        }
+      }
+    }
+    if (arr) {
+      for (const d of arr) {
         if (d && d.id && d.neutral_summary) parsedMap.set(d.id, d);
       }
     }
