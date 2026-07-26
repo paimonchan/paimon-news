@@ -187,19 +187,9 @@ export function makeClustering(deps: {
     },
 
     async refreshHotScores() {
-      const stories = await storyRepo.listForHotRefresh(72);
-      const now = Date.now();
-      for (const s of stories) {
-        const ageHours = Math.max(0, (now - new Date(s.updated_at).getTime()) / 3600000);
-        await storyRepo.updateHotScore(
-          s.id,
-          hotScore({
-            articleCount: s.article_count,
-            sourceCount: s.source_count,
-            ageHours,
-          })
-        );
-      }
+      const t0 = Date.now();
+      const cnt = await storyRepo.bulkRefreshHotScores(72);
+      console.log(`[cluster] hot score refresh: ${cnt} story diupdate dalam ${((Date.now() - t0) / 1000).toFixed(1)}s`);
     },
   };
 }

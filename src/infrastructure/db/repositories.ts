@@ -207,6 +207,16 @@ export function makeStoryRepository(db: Queryable): StoryRepository {
       await db.run("UPDATE stories SET hot_score = ? WHERE id = ?", score, storyId);
     },
 
+    bulkRefreshHotScores: async (hoursBack) => {
+      const result = await db.run(
+        `UPDATE stories SET hot_score =
+           source_count * 3 + article_count * 0.8
+           + 8 * EXP(-EXTRACT(EPOCH FROM (NOW() - updated_at)) / 36000)
+         WHERE updated_at >= NOW() - INTERVAL '${Math.floor(hoursBack)} hours'`
+      );
+      return result.changes;
+    },
+
     deleteOrphans: async () => {
       const result = await db.run(
         `DELETE FROM stories WHERE NOT EXISTS

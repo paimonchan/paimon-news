@@ -3,6 +3,14 @@ import { getContainer } from "../src/infrastructure/container";
 async function main() {
   console.log("[ingest] Starting...");
 
+  const { Pool } = await import("pg");
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 1 });
+  const stats = await pool.query(
+    "SELECT (SELECT COUNT(*) FROM articles) AS articles, (SELECT COUNT(*) FROM stories) AS stories, (SELECT COUNT(*) FROM story_articles) AS sa"
+  );
+  console.log("[ingest] DB stats before:", JSON.stringify(stats.rows[0]));
+  await pool.end();
+
   const container = getContainer();
 
   // Wait for DB (Postgres auto-migrate/seed runs async)

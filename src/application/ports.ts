@@ -37,6 +37,7 @@ export interface StoryRepository {
   delete(storyId: number): Promise<void>;
   listForHotRefresh(hoursBack: number): Promise<Pick<StoryRow, "id" | "article_count" | "source_count" | "updated_at">[]>;
   updateHotScore(storyId: number, score: number): Promise<void>;
+  bulkRefreshHotScores(hoursBack: number): Promise<number>;
   deleteOrphans(): Promise<number>;
   findById(storyId: number): Promise<StoryRow | undefined>;
 }
