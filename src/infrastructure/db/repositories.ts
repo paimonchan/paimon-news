@@ -464,7 +464,7 @@ export function makeAnalysisRepository(db: Queryable): AnalysisRepository {
          LEFT JOIN story_analysis an ON an.story_id = s.id
          WHERE s.updated_at >= datetime('now', '-48 hours')
            AND s.article_count >= 2
-           AND (an.story_id IS NULL OR an.generated_at <= datetime('now', '-6 hours'))
+           AND an.story_id IS NULL
          ORDER BY s.hot_score DESC
          LIMIT ?`,
         limit
