@@ -9,9 +9,9 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        batch: [0, 1, 2, 3]
+        batch: [0, 1, 2, 3, 4, 5, 6]
     steps:
       - run: |
           curl -s -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "${{ secrets.BASE_URL }}/api/cron/ingest?batchSize=7&batch=${{ matrix.batch }}" \
+            "${{ secrets.BASE_URL }}/api/cron/ingest?batchSize=4&batch=${{ matrix.batch }}" \
             --max-time 55
