@@ -183,6 +183,9 @@ export function makeClustering(deps: {
         }
       });
 
+      // Kumpulkan merge plan dulu — semua perbandingan di JS, DB nanti sekali
+      const mergePlan: { targetId: number; sourceIds: number[]; mergedTokens: string }[] = [];
+
       for (let i = 0; i < stories.length; i++) {
         const a = stories[i];
         if (consumed.has(a.id)) continue;
@@ -194,7 +197,6 @@ export function makeClustering(deps: {
           }
         }
 
-        // Kumpulkan semua story yg cocok dgn a, merge token in-memory dulu
         const toMerge: number[] = [];
         for (const j of candidates) {
           const b = stories[j];
@@ -204,7 +206,6 @@ export function makeClustering(deps: {
             toMerge.push(b.id);
             consumed.add(b.id);
             merged++;
-            // Merge token in-memory biar dampak ke kandidat berikutnya
             const newMap = mergeTokens(parseTokenMap(a.tokens_json), b.tokenSet);
             a.tokens_json = JSON.stringify(newMap);
             a.tokenSet = new Set(Object.keys(newMap));
@@ -212,18 +213,14 @@ export function makeClustering(deps: {
         }
 
         if (toMerge.length > 0) {
-          // Batch queries ke DB — 3 query instead of 5×N
-          await storyRepo.bulkReassignLinks(toMerge, a.id);
-          await storyRepo.recount(a.id);
-          await storyRepo.updateTokens(a.id, a.tokens_json ?? "{}");
+          mergePlan.push({ targetId: a.id, sourceIds: toMerge, mergedTokens: a.tokens_json ?? "{}" });
           console.log(`[cluster] story #${i} menyerap ${toMerge.length} story lain (total merged=${merged})`);
         }
       }
 
-      // Bulk delete semua story yg sudah dikosongkan
-      const consumedIds = [...consumed];
-      if (consumedIds.length > 0) {
-        await storyRepo.bulkDelete(consumedIds);
+      // Eksekusi SEMUA merge dalam 4 query — bulKill
+      if (mergePlan.length > 0) {
+        await storyRepo.bulkMerge(mergePlan);
       }
 
       const elapsed = ((Date.now() - t0) / 1000).toFixed(1);

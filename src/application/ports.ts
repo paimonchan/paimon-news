@@ -50,6 +50,7 @@ export interface StoryRepository {
   updateTokens(storyId: number, tokensJson: string): Promise<void>;
   reassignLinks(fromStoryId: number, toStoryId: number): Promise<void>;
   bulkReassignLinks(fromStoryIds: number[], toStoryId: number): Promise<void>;
+  bulkMerge(merges: { targetId: number; sourceIds: number[]; mergedTokens: string }[]): Promise<void>;
   moveAnalysisIfAbsent(fromStoryId: number, toStoryId: number): Promise<void>;
   delete(storyId: number): Promise<void>;
   bulkDelete(storyIds: number[]): Promise<void>;

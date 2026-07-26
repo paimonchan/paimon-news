@@ -277,6 +277,63 @@ export function makeStoryRepository(db: Queryable): StoryRepository {
       await db.run("DELETE FROM stories WHERE id = ?", storyId);
     },
 
+    bulkMerge: async (merges) => {
+      if (merges.length === 0) return;
+
+      // Flatten semua (source_id, target_id) pairs
+      const pairs: [number, number][] = [];
+      for (const m of merges) {
+        for (const src of m.sourceIds) pairs.push([src, m.targetId]);
+      }
+      if (pairs.length === 0) return;
+
+      const allSourceIds = pairs.map((p) => p[0]);
+      const allTargetIds = [...new Set(merges.map((m) => m.targetId))];
+
+      // 1. DELETE konflik: hapus link target yg artikelnya udah ada di source
+      const pairPh = pairs.map(() => "(?, ?)").join(", ");
+      const pairVals = pairs.flat();
+
+      await db.run(
+        `DELETE FROM story_articles sa
+         USING (VALUES ${pairPh}) AS mp(source_id, target_id)
+         WHERE sa.story_id = mp.target_id
+           AND EXISTS (SELECT 1 FROM story_articles sa2 WHERE sa2.story_id = mp.source_id AND sa2.article_id = sa.article_id)`,
+        ...pairVals
+      );
+
+      // 2. UPDATE reassign: pindahin semua artikel source → target
+      await db.run(
+        `UPDATE story_articles sa
+         SET story_id = mp.target_id
+         FROM (VALUES ${pairPh}) AS mp(source_id, target_id)
+         WHERE sa.story_id = mp.source_id`,
+        ...pairVals
+      );
+
+      // 3. UPDATE recount + tokens untuk semua target (CASE untuk tokens yg beda tiap story)
+      const caseWhen = merges.map(() => "WHEN ? THEN ?").join(" ");
+      const caseVals = merges.flatMap((m) => [m.targetId, m.mergedTokens]);
+      const targetPh = allTargetIds.map(() => "?").join(", ");
+
+      await db.run(
+        `UPDATE stories SET
+           article_count = (SELECT COUNT(*) FROM story_articles WHERE story_id = stories.id),
+           source_count  = (SELECT COUNT(DISTINCT a.source_id) FROM story_articles sa
+                             JOIN articles a ON a.id = sa.article_id WHERE sa.story_id = stories.id),
+           updated_at    = COALESCE((SELECT MAX(a.published_at) FROM story_articles sa
+                             JOIN articles a ON a.id = sa.article_id WHERE sa.story_id = stories.id), updated_at),
+           tokens_json = CASE id ${caseWhen} ELSE tokens_json END
+         WHERE id IN (${targetPh})`,
+        ...caseVals,
+        ...allTargetIds
+      );
+
+      // 4. DELETE semua source story
+      const srcPh = allSourceIds.map(() => "?").join(", ");
+      await db.run(`DELETE FROM stories WHERE id IN (${srcPh})`, ...allSourceIds);
+    },
+
     bulkDelete: async (storyIds) => {
       if (storyIds.length === 0) return;
       const ph = storyIds.map(() => "?").join(", ");
