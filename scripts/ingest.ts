@@ -11,7 +11,12 @@ async function main() {
 
   console.log("[ingest] DB ready, running ingest...");
 
-  const result = await container.ingest.run({ analyze: false });
+  const result = await Promise.race([
+    container.ingest.run({ analyze: false }),
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("TIMEOUT: ingest > 120 detik")), 120_000)
+    ),
+  ]);
 
   console.log(JSON.stringify({ ok: true, ...result }));
 }

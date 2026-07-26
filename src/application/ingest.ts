@@ -152,21 +152,27 @@ export function makeIngest(deps: {
             result.feedsOk++;
           }
         }
+        console.log(`[ingest] batch ${i / FETCH_CONCURRENCY + 1}/${Math.ceil(feeds.length / FETCH_CONCURRENCY)} — feeds ok=${result.feedsOk} skip=${result.feedsSkipped304} fail=${result.feedsFailed} new=${result.articlesNew}`);
       }
 
+      console.log("[ingest] meng-cluster artikel...");
       const clusterStats = await clustering.assignNewArticles();
+      console.log("[ingest] menggabung story serupa...");
       const merged = await clustering.mergeSimilarStories();
+      console.log("[ingest] refresh hot scores...");
       await clustering.refreshHotScores();
 
+      console.log("[ingest] cleanup...");
       const cleanupResult = await cleanup.run();
 
       let analyzed = 0;
       if (options.analyze !== false) {
+        console.log("[ingest] analisis...");
         analyzed = await analysis.analyzeTopStories(8);
       }
 
       console.log(
-        `[ingest] feed ok=${result.feedsOk} skip304=${result.feedsSkipped304} gagal=${result.feedsFailed} ` +
+        `[ingest] selesai — feed ok=${result.feedsOk} skip304=${result.feedsSkipped304} gagal=${result.feedsFailed} ` +
           `artikel baru=${result.articlesNew} cluster:+${clusterStats.created}/~${clusterStats.assigned}/-${merged} analisis=${analyzed}`
       );
 
