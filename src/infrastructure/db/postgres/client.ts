@@ -12,7 +12,12 @@ const globalForPg = globalThis as unknown as {
 
 export function getPg(): Queryable {
   if (globalForPg.__lensaPg) return globalForPg.__lensaPg;
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    max: 5,
+    idleTimeoutMillis: 10000,
+    connectionTimeoutMillis: 10000,
+  });
   globalForPg.__lensaPool = pool;
 
   const q = makePgQueryable(pool);
