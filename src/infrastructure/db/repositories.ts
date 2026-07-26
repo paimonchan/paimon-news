@@ -150,21 +150,26 @@ export function makeStoryRepository(db: Queryable): StoryRepository {
       if (rows.length === 0) return [];
 
       const cols = ["title", "category", "created_at", "updated_at", "tokens_json"];
-      const rowsSql = rows.map(() => cols.map(() => "?").join(", ")).join("), (");
-      const values: unknown[] = [];
-      for (const r of rows) {
-        values.push(r.title, r.category, r.created_at, r.created_at, r.tokens_json);
+      const ids: number[] = [];
+
+      // Batch per 500 biar query size gak kebesaran
+      for (let i = 0; i < rows.length; i += 500) {
+        const batch = rows.slice(i, i + 500);
+        const rowsSql = batch.map(() => cols.map(() => "?").join(", ")).join("), (");
+        const values: unknown[] = [];
+        for (const r of batch) {
+          values.push(r.title, r.category, r.created_at, r.created_at, r.tokens_json);
+        }
+        const result = await db.all<{ id: number }>(
+          `INSERT INTO stories (${cols.join(", ")})
+           VALUES (${rowsSql})
+           RETURNING id`,
+          ...values
+        );
+        for (const r of result) ids.push(r.id);
       }
 
-      // Pakai all() biar dapet semua RETURNING id
-      const result = await db.all<{ id: number }>(
-        `INSERT INTO stories (${cols.join(", ")})
-         VALUES (${rowsSql})
-         ON CONFLICT DO NOTHING
-         RETURNING id`,
-        ...values
-      );
-      return result.map((r) => r.id);
+      return ids;
     },
 
     linkArticle: async (storyId, articleId, similarity) => {
