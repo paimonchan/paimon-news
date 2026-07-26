@@ -14,7 +14,7 @@ async function main() {
   const result = await Promise.race([
     container.ingest.run({ analyze: false }),
     new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("TIMEOUT: ingest > 120 detik")), 120_000)
+      setTimeout(() => reject(new Error("TIMEOUT: ingest > 300 detik")), 300_000)
     ),
   ]);
 
