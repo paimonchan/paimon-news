@@ -42,8 +42,11 @@ export async function chatJson<T>(messages: ChatMessage[]): Promise<AiResult<T> 
     }
 
     const body = (await res.json()) as ChatCompletionResponse;
-    const content = body.choices?.[0]?.message?.content;
+    let content = body.choices?.[0]?.message?.content;
     if (!content) return null;
+
+    // Bersihkan code fences (```json ... ``` atau ``` ... ```) — beberapa model (Gemini, Ollama) suka bungkus JSON
+    content = content.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
 
     return {
       data: JSON.parse(content) as T,
