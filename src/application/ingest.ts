@@ -181,7 +181,7 @@ export function makeIngest(deps: {
       let analyzed = 0;
       if (options.analyze !== false) {
         console.log("[ingest] analisis...");
-        analyzed = await analysis.analyzeTopStories(8);
+        analyzed = await analysis.analyzeTopStories(275);
       }
 
       console.log(
