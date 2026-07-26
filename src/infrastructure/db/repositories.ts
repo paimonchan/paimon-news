@@ -243,6 +243,22 @@ export function makeStoryRepository(db: Queryable): StoryRepository {
       );
     },
 
+    bulkReassignLinks: async (fromStoryIds, toStoryId) => {
+      if (fromStoryIds.length === 0) return;
+      const ph = fromStoryIds.map(() => "?").join(", ");
+      await db.run(
+        `DELETE FROM story_articles WHERE story_id = ? AND article_id IN
+         (SELECT article_id FROM story_articles WHERE story_id IN (${ph}))`,
+        toStoryId,
+        ...fromStoryIds
+      );
+      await db.run(
+        `UPDATE story_articles SET story_id = ? WHERE story_id IN (${ph})`,
+        toStoryId,
+        ...fromStoryIds
+      );
+    },
+
     moveAnalysisIfAbsent: async (fromStoryId, toStoryId) => {
       const has = await db.get<{ story_id: number }>(
         "SELECT story_id FROM story_analysis WHERE story_id = ?",
@@ -259,6 +275,12 @@ export function makeStoryRepository(db: Queryable): StoryRepository {
 
     delete: async (storyId) => {
       await db.run("DELETE FROM stories WHERE id = ?", storyId);
+    },
+
+    bulkDelete: async (storyIds) => {
+      if (storyIds.length === 0) return;
+      const ph = storyIds.map(() => "?").join(", ");
+      await db.run(`DELETE FROM stories WHERE id IN (${ph})`, ...storyIds);
     },
 
     listForHotRefresh: (hoursBack) =>

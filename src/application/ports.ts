@@ -49,8 +49,10 @@ export interface StoryRepository {
   bulkRecount(storyIds: number[]): Promise<void>;
   updateTokens(storyId: number, tokensJson: string): Promise<void>;
   reassignLinks(fromStoryId: number, toStoryId: number): Promise<void>;
+  bulkReassignLinks(fromStoryIds: number[], toStoryId: number): Promise<void>;
   moveAnalysisIfAbsent(fromStoryId: number, toStoryId: number): Promise<void>;
   delete(storyId: number): Promise<void>;
+  bulkDelete(storyIds: number[]): Promise<void>;
   listForHotRefresh(hoursBack: number): Promise<Pick<StoryRow, "id" | "article_count" | "source_count" | "updated_at">[]>;
   updateHotScore(storyId: number, score: number): Promise<void>;
   bulkRefreshHotScores(hoursBack: number): Promise<number>;

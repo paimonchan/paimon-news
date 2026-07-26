@@ -194,29 +194,38 @@ export function makeClustering(deps: {
           }
         }
 
-        let mergedIntoA = 0;
+        // Kumpulkan semua story yg cocok dgn a, merge token in-memory dulu
+        const toMerge: number[] = [];
         for (const j of candidates) {
           const b = stories[j];
           if (consumed.has(b.id)) continue;
           const sim = overlapCoefficient(a.tokenSet, b.tokenSet);
           if (sim >= MERGE_THRESHOLD) {
-            await storyRepo.reassignLinks(b.id, a.id);
-            await storyRepo.moveAnalysisIfAbsent(b.id, a.id);
-            await storyRepo.delete(b.id);
-            const newMap = mergeTokens(parseTokenMap(a.tokens_json), b.tokenSet);
-            await storyRepo.updateTokens(a.id, JSON.stringify(newMap));
-            await storyRepo.recount(a.id);
-            a.tokens_json = JSON.stringify(newMap);
-            a.tokenSet = new Set(Object.keys(newMap));
+            toMerge.push(b.id);
             consumed.add(b.id);
             merged++;
-            mergedIntoA++;
+            // Merge token in-memory biar dampak ke kandidat berikutnya
+            const newMap = mergeTokens(parseTokenMap(a.tokens_json), b.tokenSet);
+            a.tokens_json = JSON.stringify(newMap);
+            a.tokenSet = new Set(Object.keys(newMap));
           }
         }
-        if (mergedIntoA > 0) {
-          console.log(`[cluster] story #${i} menyerap ${mergedIntoA} story lain (total merged=${merged})`);
+
+        if (toMerge.length > 0) {
+          // Batch queries ke DB — 3 query instead of 5×N
+          await storyRepo.bulkReassignLinks(toMerge, a.id);
+          await storyRepo.recount(a.id);
+          await storyRepo.updateTokens(a.id, a.tokens_json ?? "{}");
+          console.log(`[cluster] story #${i} menyerap ${toMerge.length} story lain (total merged=${merged})`);
         }
       }
+
+      // Bulk delete semua story yg sudah dikosongkan
+      const consumedIds = [...consumed];
+      if (consumedIds.length > 0) {
+        await storyRepo.bulkDelete(consumedIds);
+      }
+
       const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
       console.log(`[cluster] merge selesai: ${merged} tergabung dalam ${elapsed}s`);
       return merged;
