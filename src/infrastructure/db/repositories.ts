@@ -68,6 +68,38 @@ export function makeArticleRepository(db: Queryable): ArticleRepository {
       return result.changes;
     },
 
+    bulkInsertIgnore: async (articles: NewArticle[]) => {
+      if (articles.length === 0) return 0;
+
+      const cols = [
+        "source_id", "feed_id", "guid", "url", "url_hash",
+        "title", "description", "image_url", "author",
+        "category", "published_at", "title_tokens",
+      ];
+
+      const rows = articles
+        .map(() => cols.map(() => "?").join(", "))
+        .map((r, i) => (i === 0 ? `(${r})` : `(${r})`))
+        .join(", ");
+
+      const params: unknown[] = [];
+      for (const a of articles) {
+        params.push(
+          a.source_id, a.feed_id, a.guid, a.url, a.url_hash,
+          a.title, a.description, a.image_url, a.author,
+          a.category, a.published_at, a.title_tokens
+        );
+      }
+
+      const result = await db.run(
+        `INSERT INTO articles (${cols.join(", ")})
+         VALUES ${rows}
+         ON CONFLICT(url_hash) DO NOTHING`,
+        ...params
+      );
+      return result.changes;
+    },
+
     findUnassignedSince: (hoursBack) =>
       db.all<ArticleRow>(
         `SELECT a.* FROM articles a

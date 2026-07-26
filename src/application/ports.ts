@@ -21,6 +21,7 @@ export interface FeedRepository {
 
 export interface ArticleRepository {
   insertIgnore(article: NewArticle): Promise<number>;
+  bulkInsertIgnore(articles: NewArticle[]): Promise<number>;
   findUnassignedSince(hoursBack: number): Promise<ArticleRow[]>;
   deleteOlderThanDays(days: number): Promise<number>;
 }

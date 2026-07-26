@@ -108,11 +108,8 @@ export function makeIngest(deps: {
         return { added: 0, skipped304: true };
       }
 
-      let added = 0;
-      for (const item of result.items) {
-        const article = mapItemToArticle(item, feed);
-        if (article) added += await articleRepo.insertIgnore(article);
-      }
+      const articles = result.items.map((item) => mapItemToArticle(item, feed)).filter(Boolean) as NewArticle[];
+      const added = articles.length > 0 ? await articleRepo.bulkInsertIgnore(articles) : 0;
 
       await feedRepo.markSuccess(feed.id, { etag: result.etag, lastModified: result.lastModified });
       return { added, skipped304: false };
