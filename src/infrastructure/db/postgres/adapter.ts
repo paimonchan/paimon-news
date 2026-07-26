@@ -4,8 +4,8 @@ import type { Queryable, QueryResult } from "../queryable";
 function sql2pg(sql: string, params: unknown[]): { text: string; values: unknown[] } {
   let text = sql;
 
-  // datetime('now', '±N hours/minutes/days') → NOW() ± INTERVAL 'N hours/minutes/days'
-  text = text.replace(/datetime\('now',\s*'([+-])(\d+)\s+(minutes|hours|days)'\)/g, (_, sign: string, n: string, unit: string) => {
+  // datetime('now', '±N hour(s)/minute(s)/day(s)') → NOW() ± INTERVAL 'N hour(s)/minute(s)/day(s)'
+  text = text.replace(/datetime\('now',\s*'([+-])(\d+)\s+(minutes?|hours?|days?)'\)/g, (_, sign: string, n: string, unit: string) => {
     if (sign === "+") return `NOW() + INTERVAL '${n} ${unit}'`;
     return `NOW() - INTERVAL '${n} ${unit}'`;
   });
