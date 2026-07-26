@@ -68,9 +68,14 @@ export function makePgQueryable(pool: Pool): Queryable {
     async run(sql: string, ...params: unknown[]): Promise<QueryResult> {
       const { text, values } = sql2pg(sql, params);
 
-      // Append RETURNING id for INSERT queries without RETURNING
+      // Only add RETURNING id for tables that have an id column
+      const tablesWithId = /\b(sources|feeds|articles|stories|users|digest_subscriptions)\b/i;
       let queryText = text;
-      if (/^\s*INSERT\s+INTO/i.test(queryText) && !/RETURNING\s/i.test(queryText)) {
+      if (
+        /^\s*INSERT\s+INTO\s+/i.test(queryText) &&
+        !/RETURNING\s/i.test(queryText) &&
+        tablesWithId.test(queryText)
+      ) {
         queryText = queryText.replace(/;?\s*$/, "") + " RETURNING id";
       }
 

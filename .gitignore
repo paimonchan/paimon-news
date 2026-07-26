@@ -50,3 +50,6 @@ test-feeds2.mjs
 # log dev server
 data/dev-server.log
 data/dev-server.err.log
+
+.vercel
+.env*
