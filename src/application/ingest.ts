@@ -15,7 +15,7 @@ import { normalizeUrl, stripHtml, tokenize } from "@/domain/text";
 import type { RssItem } from "@/infrastructure/rss/fetcher";
 
 const MAX_AGE_DAYS = 7;
-const FETCH_CONCURRENCY = 4;
+const FETCH_CONCURRENCY = 8;
 
 export interface IngestOptions {
   /** Batasi jumlah feed per panggilan (untuk lingkungan serverless dengan batas durasi). */

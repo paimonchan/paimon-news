@@ -68,7 +68,7 @@ export async function fetchFeed(
 
   const res = await fetch(url, {
     headers,
-    signal: AbortSignal.timeout(20000),
+    signal: AbortSignal.timeout(10000),
     redirect: "follow",
   });
 
