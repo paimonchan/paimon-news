@@ -5,15 +5,6 @@ jobs:
   debug:
     runs-on: ubuntu-latest
     steps:
-      - run: |
-          echo "AI_API_KEY length: ${#AI_API_KEY}"
-          echo "AI_API_KEY first 4: ${AI_API_KEY:0:4}"
-          echo "AI_BASE_URL: $AI_BASE_URL"
-          echo "AI_MODEL: $AI_MODEL"
-        env:
-          AI_API_KEY: ${{ secrets.AI_API_KEY }}
-          AI_BASE_URL: ${{ secrets.AI_BASE_URL }}
-          AI_MODEL: ${{ secrets.AI_MODEL }}
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
@@ -21,11 +12,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: |
-          curl -s -X POST "$AI_BASE_URL/chat/completions" \
-            -H "Content-Type: application/json" \
-            -H "Authorization: Bearer $AI_API_KEY" \
-            -d '{"model":"'"$AI_MODEL"'","messages":[{"role":"user","content":"hi"}],"max_tokens":5}' \
-            --max-time 10
+          echo "AI_MODEL=$AI_MODEL"
+          echo "AI_BASE_URL=$AI_BASE_URL"
+          echo "API key length: ${#AI_API_KEY}"
+          npx tsx scripts/test-ai.ts
         env:
           AI_API_KEY: ${{ secrets.AI_API_KEY }}
           AI_BASE_URL: ${{ secrets.AI_BASE_URL }}
