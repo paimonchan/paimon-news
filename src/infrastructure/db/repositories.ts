@@ -462,8 +462,7 @@ export function makeAnalysisRepository(db: Queryable): AnalysisRepository {
       const rows = await db.all<{ id: number }>(
         `SELECT s.id FROM stories s
          LEFT JOIN story_analysis an ON an.story_id = s.id
-         WHERE s.updated_at >= datetime('now', '-48 hours')
-           AND s.article_count >= 2
+         WHERE s.article_count >= 2
            AND an.story_id IS NULL
          ORDER BY s.hot_score DESC
          LIMIT ?`,
