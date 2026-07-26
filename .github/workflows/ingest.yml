@@ -17,3 +17,6 @@ jobs:
       - run: npx tsx scripts/ingest.ts
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          AI_API_KEY: ${{ secrets.AI_API_KEY }}
+          AI_BASE_URL: ${{ secrets.AI_BASE_URL }}
+          AI_MODEL: ${{ secrets.AI_MODEL }}
