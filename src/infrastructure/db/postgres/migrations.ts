@@ -126,10 +126,15 @@ CREATE TABLE IF NOT EXISTS digest_subscriptions (
 `;
 
 export async function runPgMigrations(db: Queryable): Promise<void> {
-  const row = await db.get<{ version: number }>(
-    "SELECT version FROM _migrations ORDER BY version DESC LIMIT 1"
-  );
-  const current = row?.version ?? 0;
+  let current = 0;
+  try {
+    const row = await db.get<{ version: number }>(
+      "SELECT version FROM _migrations ORDER BY version DESC LIMIT 1"
+    );
+    current = row?.version ?? 0;
+  } catch {
+    // _migrations belum ada — fresh database
+  }
   if (current < SCHEMA_VERSION) {
     await db.run(SCHEMA_SQL);
     console.log(`[pg] Migrasi v${SCHEMA_VERSION} (schema awal) diterapkan.`);
