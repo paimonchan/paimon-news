@@ -70,7 +70,7 @@ export async function chatJson<T>(messages: ChatMessage[]): Promise<AiResult<T> 
     let content = body.choices?.[0]?.message?.content;
     console.log("[ai] RAW content length:", content?.length ?? 0, "preview:", (content ?? "").slice(0, 120));
     if (!content) {
-      console.log("[ai] empty content — finish_reason:", body.choices?.[0]?.finish_reason);
+      console.log("[ai] empty content");
       return null;
     }
 
