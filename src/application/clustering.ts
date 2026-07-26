@@ -51,6 +51,42 @@ export function makeClustering(deps: {
 
       const stories = await loadRecentStories();
 
+      // Fast-path: jika belum ada story sama sekali, bulk insert langsung
+      if (stories.length === 0) {
+        console.log(`[cluster] bulk-assign ${articles.length} artikel ke story baru...`);
+        const t0 = Date.now();
+        const storyRows = articles.map((a) => ({
+          title: a.title,
+          category: a.category,
+          created_at: a.published_at ?? new Date().toISOString(),
+          tokens_json: JSON.stringify(
+            Object.fromEntries(
+              [...(a.title_tokens ?? "").split(" ").filter(Boolean)].map((t) => [t, 1])
+            )
+          ),
+        }));
+
+        // Bulk insert stories
+        const storyIds = await storyRepo.bulkInsert(storyRows);
+        const now = new Date().toISOString();
+
+        // Bulk link articles
+        await storyRepo.bulkLinkArticles(
+          articles.map((a, i) => ({
+            story_id: storyIds[i],
+            article_id: a.id,
+            similarity: 1,
+          }))
+        );
+
+        // Bulk recount
+        await storyRepo.bulkRecount(storyIds);
+
+        const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+        console.log(`[cluster] bulk-assign selesai: ${articles.length} story dalam ${elapsed}s`);
+        return { assigned: 0, created: articles.length };
+      }
+
       // Inverted index: token -> indeks story (kandidat tanpa O(n*m) penuh)
       const tokenIndex = new Map<string, number[]>();
       stories.forEach((s, i) => {

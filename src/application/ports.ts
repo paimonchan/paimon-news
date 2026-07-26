@@ -26,11 +26,27 @@ export interface ArticleRepository {
   deleteOlderThanDays(days: number): Promise<number>;
 }
 
+export interface StoryInsertRow {
+  title: string;
+  category: string;
+  created_at: string;
+  tokens_json: string;
+}
+
+export interface StoryArticleLink {
+  story_id: number;
+  article_id: number;
+  similarity: number;
+}
+
 export interface StoryRepository {
   findRecent(hoursBack: number): Promise<StoryRow[]>;
   insert(title: string, category: string, at: string, tokensJson: string): Promise<number>;
+  bulkInsert(rows: StoryInsertRow[]): Promise<number[]>;
   linkArticle(storyId: number, articleId: number, similarity: number): Promise<void>;
+  bulkLinkArticles(links: StoryArticleLink[]): Promise<void>;
   recount(storyId: number): Promise<void>;
+  bulkRecount(storyIds: number[]): Promise<void>;
   updateTokens(storyId: number, tokensJson: string): Promise<void>;
   reassignLinks(fromStoryId: number, toStoryId: number): Promise<void>;
   moveAnalysisIfAbsent(fromStoryId: number, toStoryId: number): Promise<void>;

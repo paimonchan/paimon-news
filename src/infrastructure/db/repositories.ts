@@ -146,12 +146,64 @@ export function makeStoryRepository(db: Queryable): StoryRepository {
       return result.lastInsertRowid ?? 0;
     },
 
+    bulkInsert: async (rows) => {
+      if (rows.length === 0) return [];
+
+      const cols = ["title", "category", "created_at", "updated_at", "tokens_json"];
+      const rowsSql = rows.map(() => cols.map(() => "?").join(", ")).join("), (");
+      const values: unknown[] = [];
+      for (const r of rows) {
+        values.push(r.title, r.category, r.created_at, r.created_at, r.tokens_json);
+      }
+
+      // Pakai all() biar dapet semua RETURNING id
+      const result = await db.all<{ id: number }>(
+        `INSERT INTO stories (${cols.join(", ")})
+         VALUES (${rowsSql})
+         ON CONFLICT DO NOTHING
+         RETURNING id`,
+        ...values
+      );
+      return result.map((r) => r.id);
+    },
+
     linkArticle: async (storyId, articleId, similarity) => {
       await db.run(
         "INSERT OR IGNORE INTO story_articles (story_id, article_id, similarity) VALUES (?, ?, ?)",
         storyId,
         articleId,
         similarity
+      );
+    },
+
+    bulkLinkArticles: async (links) => {
+      if (links.length === 0) return;
+
+      const rows = links.map(() => "(?, ?, ?)").join(", ");
+      const values: unknown[] = [];
+      for (const l of links) {
+        values.push(l.story_id, l.article_id, l.similarity);
+      }
+      await db.run(
+        `INSERT OR IGNORE INTO story_articles (story_id, article_id, similarity)
+         VALUES ${rows}`,
+        ...values
+      );
+    },
+
+    bulkRecount: async (storyIds) => {
+      if (storyIds.length === 0) return;
+
+      // Update article_count, source_count, updated_at untuk semua story sekaligus
+      await db.run(
+        `UPDATE stories SET
+           article_count = (SELECT COUNT(*) FROM story_articles sa WHERE sa.story_id = stories.id),
+           source_count  = (SELECT COUNT(DISTINCT a.source_id) FROM story_articles sa
+                            JOIN articles a ON a.id = sa.article_id WHERE sa.story_id = stories.id),
+           updated_at    = COALESCE((SELECT MAX(a.published_at) FROM story_articles sa
+                            JOIN articles a ON a.id = sa.article_id WHERE sa.story_id = stories.id), updated_at)
+         WHERE id IN (${storyIds.map(() => "?").join(", ")})`,
+        ...storyIds
       );
     },
 
