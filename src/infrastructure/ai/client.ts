@@ -1,6 +1,3 @@
-// Klien OpenAI-compatible (OpenAI, OpenRouter, Groq, DeepSeek, Ollama, dll).
-// Komunikasi lewat HTTP biasa — tanpa SDK, model bebas diganti via env.
-
 import { config } from "@/infrastructure/config";
 
 export interface ChatMessage {
@@ -16,6 +13,30 @@ export interface AiResult<T> {
 interface ChatCompletionResponse {
   choices?: { message?: { content?: string } }[];
   usage?: { prompt_tokens?: number; completion_tokens?: number };
+}
+
+/** Cari JSON value pertama (object atau array) dalam string, buang teks sebelum/sesudah. */
+function extractJson(raw: string): string {
+  const idx = raw.search(/[[{]/);
+  if (idx === -1) return raw;
+  const first = raw[idx];
+  const close = first === "[" ? "]" : "}";
+  let depth = 0, inStr = false;
+  for (let i = idx; i < raw.length; i++) {
+    const ch = raw[i];
+    if (inStr) {
+      if (ch === "\\") { i++; continue; }
+      if (ch === '"') inStr = false;
+      continue;
+    }
+    if (ch === '"') { inStr = true; continue; }
+    if (ch === first) depth++;
+    else if (ch === close) {
+      depth--;
+      if (depth === 0) return raw.slice(idx, i + 1);
+    }
+  }
+  return raw;
 }
 
 export async function chatJson<T>(messages: ChatMessage[]): Promise<AiResult<T> | null> {
@@ -46,15 +67,9 @@ export async function chatJson<T>(messages: ChatMessage[]): Promise<AiResult<T> 
     let content = body.choices?.[0]?.message?.content;
     if (!content) return null;
 
-    // Bersihkan code fences (```json ... ``` atau ``` ... ```)
+    // Bersihkan code fences & teks luar JSON
     content = content.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
-
-    // Cari JSON object pertama (beberapa model sisipkan teks setelah JSON)
-    const firstBrace = content.indexOf("{");
-    const lastBrace = content.lastIndexOf("}");
-    if (firstBrace !== -1 && lastBrace > firstBrace) {
-      content = content.slice(firstBrace, lastBrace + 1);
-    }
+    content = extractJson(content);
 
     return {
       data: JSON.parse(content) as T,
