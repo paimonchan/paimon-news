@@ -50,8 +50,14 @@ export function sanitizeMalformedXml(xml: string): string {
   });
 }
 
-function parseXml(xml: string): Promise<{ items?: RssItem[] }> {
-  return parser.parseString(xml).catch(() => parser.parseString(sanitizeMalformedXml(xml)));
+function parseXml(xml: string, _signal: AbortSignal): Promise<{ items?: RssItem[] }> {
+  return Promise.race([
+    parser.parseString(xml).catch(() => parser.parseString(sanitizeMalformedXml(xml))),
+    new Promise<never>((_, reject) => {
+      const id = setTimeout(() => reject(new Error("XML parse timed out")), 8000);
+      _signal.addEventListener("abort", () => { clearTimeout(id); reject(new Error("XML parse aborted")); }, { once: true });
+    }),
+  ]);
 }
 
 /** Fetch feed dengan conditional GET (ETag / Last-Modified) untuk hemat bandwidth. */
@@ -66,11 +72,14 @@ export async function fetchFeed(
   if (conditional?.etag) headers["If-None-Match"] = conditional.etag;
   if (conditional?.lastModified) headers["If-Modified-Since"] = conditional.lastModified;
 
+  const abortController = new AbortController();
+  const timeout = setTimeout(() => abortController.abort(), 15000);
+
   const res = await fetch(url, {
     headers,
-    signal: AbortSignal.timeout(10000),
+    signal: abortController.signal,
     redirect: "follow",
-  });
+  }).finally(() => clearTimeout(timeout));
 
   const etag = res.headers.get("etag");
   const lastModified = res.headers.get("last-modified");
@@ -83,7 +92,7 @@ export async function fetchFeed(
   }
 
   const xml = await res.text();
-  const parsed = await parseXml(xml);
+  const parsed = await parseXml(xml, abortController.signal);
 
   return {
     status: 200,
