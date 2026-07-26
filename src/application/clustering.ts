@@ -132,6 +132,8 @@ export function makeClustering(deps: {
 
     async mergeSimilarStories() {
       const stories = (await loadRecentStories()).filter((s) => s.article_count > 0);
+      const t0 = Date.now();
+      console.log(`[cluster] merge: ${stories.length} stories to compare`);
       let merged = 0;
       const consumed = new Set<number>();
 
@@ -156,6 +158,7 @@ export function makeClustering(deps: {
           }
         }
 
+        let mergedIntoA = 0;
         for (const j of candidates) {
           const b = stories[j];
           if (consumed.has(b.id)) continue;
@@ -171,9 +174,15 @@ export function makeClustering(deps: {
             a.tokenSet = new Set(Object.keys(newMap));
             consumed.add(b.id);
             merged++;
+            mergedIntoA++;
           }
         }
+        if (mergedIntoA > 0) {
+          console.log(`[cluster] story #${i} menyerap ${mergedIntoA} story lain (total merged=${merged})`);
+        }
       }
+      const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+      console.log(`[cluster] merge selesai: ${merged} tergabung dalam ${elapsed}s`);
       return merged;
     },
 
