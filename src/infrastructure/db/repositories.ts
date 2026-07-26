@@ -291,7 +291,7 @@ export function makeStoryRepository(db: Queryable): StoryRepository {
       const allTargetIds = [...new Set(merges.map((m) => m.targetId))];
 
       // 1. DELETE konflik: hapus link target yg artikelnya udah ada di source
-      const pairPh = pairs.map(() => "(?, ?)").join(", ");
+      const pairPh = pairs.map(() => "(?::int, ?::int)").join(", ");
       const pairVals = pairs.flat();
 
       await db.run(
