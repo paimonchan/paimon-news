@@ -30,7 +30,17 @@ export function openDb(dbPath: string): Queryable {
 
 function openDbRaw(dbPath: string): Db {
   if (dbPath !== ":memory:") {
-    fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+    try {
+      fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+    } catch {
+      // Serverless (Vercel etc.) — fallback ke in-memory
+      const mem = new Database(":memory:");
+      mem.pragma("journal_mode = WAL");
+      mem.pragma("foreign_keys = ON");
+      runMigrations(mem);
+      seedSources(mem);
+      return mem;
+    }
   }
   const db = new Database(dbPath);
   db.pragma("journal_mode = WAL");
