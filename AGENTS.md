@@ -81,7 +81,9 @@ jobs:
           AI_MODEL: ${{ secrets.AI_MODEL }}
 ```
 
-### 4. Create .github/workflows/digest.yml
+### 4. GitHub Actions — Kirim Digest Langsung ke DB
+
+⚠️ **Catatan:** `/api/cron/digest` di Vercel sudah **DEPRECATED**. Digest sekarang jalan langsung dari GitHub Actions via `scripts/digest.ts`.
 
 ```yaml
 name: Kirim Digest
@@ -89,13 +91,22 @@ on:
   schedule:
     - cron: '15 15 * * *'  # 22:00 WIB (UTC+7) = 15:00 UTC
   workflow_dispatch:
+
 jobs:
   digest:
     runs-on: ubuntu-latest
     steps:
-      - run: |
-          curl -s -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "${{ secrets.BASE_URL }}/api/cron/digest" --max-time 55
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/digest.ts
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          MAIL_FROM: ${{ secrets.MAIL_FROM }}
 ```
 
 ### 5. Create .github/workflows/keepalive.yml
@@ -133,6 +144,8 @@ Set di Settings → Secrets and variables → Actions:
 
 ## Catatan
 
+- **PostgreSQL adapter**: `src/infrastructure/db/postgres/adapter.ts` menerjemahkan fungsi SQLite (`datetime()`, `INSERT OR IGNORE`) ke PostgreSQL (`NOW()`, `ON CONFLICT`) secara otomatis.
+- **Login fix**: Query yang pakai `datetime('now', ?)` dengan parameter offset sudah direfactor ke JavaScript `Date.toISOString()`.
 - 500MB database Supabase cukup untuk ~50.000 artikel + analysis + metadata
 - 60s timeout Vercel Hobby cukup untuk 7 feed (FETCH_CONCURRENCY=4)
 - 4 parallel batch calls via GitHub Actions matrix: total 28 feed/15 menit
