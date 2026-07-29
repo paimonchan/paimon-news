@@ -8,6 +8,7 @@ import type { Perspective } from "@/domain/entities";
 import { StoryCard } from "@/components/StoryCard";
 import { BookmarkButton } from "@/components/BookmarkButton";
 import { SourceAvatar } from "@/components/SourceChip";
+import { config } from "@/infrastructure/config";
 
 export const revalidate = 600;
 
@@ -19,9 +20,30 @@ export async function generateMetadata({
   const { id } = await params;
   const detail = await getContainer().queries.getStoryDetail(Number(id));
   if (!detail) return { title: "Peristiwa tidak ditemukan" };
+
+  const { story, analysis, articles } = detail;
+  const description = analysis?.neutral_summary ?? undefined;
+  const image = articles.find((a) => a.image_url)?.image_url ?? undefined;
+
   return {
-    title: detail.story.title,
-    description: detail.analysis?.neutral_summary ?? undefined,
+    title: story.title,
+    description,
+    openGraph: {
+      title: story.title,
+      description,
+      url: `${config.baseUrl}/story/${story.id}`,
+      type: "article",
+      siteName: "Lensa",
+      ...(image ? { images: [{ url: image, width: 1200, height: 630 }] } : {}),
+      publishedTime: articles.length > 0 ? articles[articles.length - 1].published_at : undefined,
+      modifiedTime: story.updated_at,
+    },
+    twitter: {
+      card: image ? "summary_large_image" : "summary",
+      title: story.title,
+      description,
+      ...(image ? { images: [image] } : {}),
+    },
   };
 }
 
@@ -59,6 +81,32 @@ export default async function StoryPage({
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "NewsArticle",
+            headline: story.title,
+            description: analysis?.neutral_summary ?? undefined,
+            ...(articles.find((a) => a.image_url)?.image_url
+              ? { image: articles.find((a) => a.image_url)!.image_url }
+              : {}),
+            datePublished: articles.length > 0 ? articles[articles.length - 1].published_at : undefined,
+            dateModified: story.updated_at,
+            author: articles
+              .filter((a, i, arr) => arr.findIndex((b) => b.source_slug === a.source_slug) === i)
+              .map((a) => ({
+                "@type": "Organization",
+                name: a.source_name,
+              })),
+            publisher: {
+              "@type": "Organization",
+              name: "Lensa",
+            },
+          }),
+        }}
+      />
       <nav className="mb-4 text-sm text-stone-500">
         <Link href="/" className="hover:text-amber-700">Beranda</Link>
         <span className="mx-1.5">/</span>

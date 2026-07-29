@@ -5,19 +5,41 @@ import { Suspense } from "react";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
+import { config } from "@/infrastructure/config";
 
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
 });
 
+const baseUrl = config.baseUrl;
+
 export const metadata: Metadata = {
+  metadataBase: new URL(baseUrl),
   title: {
     default: "Lensa — Satu Peristiwa, Semua Sudut Pandang",
     template: "%s · Lensa",
   },
   description:
     "Gateway berita Indonesia: satu peristiwa dari banyak portal dibandingkan berdampingan — ringkasan netral, perspektif tiap sumber, dan blindspot-nya.",
+  openGraph: {
+    type: "website",
+    siteName: "Lensa",
+    title: "Lensa — Satu Peristiwa, Semua Sudut Pandang",
+    description:
+      "Gateway berita Indonesia: satu peristiwa dari banyak portal dibandingkan berdampingan — ringkasan netral, perspektif tiap sumber, dan blindspot-nya.",
+    url: baseUrl,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Lensa — Satu Peristiwa, Semua Sudut Pandang",
+    description:
+      "Gateway berita Indonesia: satu peristiwa dari banyak portal dibandingkan berdampingan.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 function HeaderSkeleton() {
