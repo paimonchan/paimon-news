@@ -103,7 +103,7 @@ export function makeQueries(db: Queryable, ftsEnabled = false) {
         source_count: row.source_count,
         hot_score: row.hot_score,
         image_url: rep?.image_url ?? null,
-        summary: summary ?? (excerpt(rep?.description, 240) || null),
+        summary: (summary || excerpt(rep?.description, 240)) || null,
         sources: sourceMap.get(row.id) ?? [],
       };
     });
