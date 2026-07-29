@@ -7,6 +7,8 @@ import type {
   StoryCard,
   StoryRow,
 } from "@/domain/entities";
+import { cache as reactCache } from "react";
+import { unstable_cache as nextCache } from "next/cache";
 
 export const PER_PAGE = 20;
 
@@ -107,153 +109,7 @@ export function makeQueries(db: Queryable) {
     });
   }
 
-  return {
-    async getTopStories(page = 1, perPage = PER_PAGE, category?: string) {
-      const where = category ? "WHERE s.category = ?" : "";
-      const params: unknown[] = category ? [category] : [];
-
-      const totalRow = await db.get<{ c: number }>(
-        `SELECT COUNT(*) AS c FROM stories s ${where}`,
-        ...params
-      );
-
-      const rows = await db.all<StoryRow>(
-        `SELECT s.* FROM stories s ${where}
-         ORDER BY s.hot_score DESC, s.updated_at DESC
-         LIMIT ? OFFSET ?`,
-        ...params,
-        perPage,
-        (page - 1) * perPage
-      );
-
-      return { stories: await rowsToCards(rows), total: totalRow?.c ?? 0 };
-    },
-
-    async getStoryDetail(id: number) {
-      const story = await db.get<StoryRow>("SELECT * FROM stories WHERE id = ?", id);
-      if (!story) return null;
-
-      const analysis =
-        (await db.get<AnalysisRow>("SELECT * FROM story_analysis WHERE story_id = ?", id)) ??
-        null;
-
-      const articles = await db.all<
-        StoryDetail["articles"][number]
-      >(
-        `SELECT a.*, s.name AS source_name, s.slug AS source_slug, s.character AS source_character
-         FROM story_articles sa
-         JOIN articles a ON a.id = sa.article_id
-         JOIN sources s ON s.id = a.source_id
-         WHERE sa.story_id = ?
-         ORDER BY a.published_at DESC`,
-        id
-      );
-
-      return { story, analysis, articles, sources: await getStorySources(id) };
-    },
-
-    async getLatestArticles(page = 1, perPage = PER_PAGE, category?: string) {
-      const where = category ? "WHERE a.category = ?" : "";
-      const params: unknown[] = category ? [category] : [];
-
-      const totalRow = await db.get<{ c: number }>(
-        `SELECT COUNT(*) AS c FROM articles a ${where}`,
-        ...params
-      );
-
-      const articles = await db.all<LatestArticle>(
-        `SELECT a.*, s.name AS source_name, s.slug AS source_slug
-         FROM articles a JOIN sources s ON s.id = a.source_id
-         ${where}
-         ORDER BY a.published_at DESC
-         LIMIT ? OFFSET ?`,
-        ...params,
-        perPage,
-        (page - 1) * perPage
-      );
-
-      return { articles, total: totalRow?.c ?? 0 };
-    },
-
-    async searchAll(q: string, perPage = 30) {
-      const escaped = q.replace(/[%_]/g, (m) => `\\${m}`);
-      const like = `%${escaped}%`;
-
-      const storyRows = await db.all<StoryRow>(
-        `SELECT * FROM stories
-         WHERE title LIKE ? ESCAPE '\\'
-         ORDER BY hot_score DESC LIMIT 10`,
-        like
-      );
-
-      const articles = await db.all<LatestArticle>(
-        `SELECT a.*, s.name AS source_name, s.slug AS source_slug
-         FROM articles a JOIN sources s ON s.id = a.source_id
-         WHERE a.title LIKE ? ESCAPE '\\' OR a.description LIKE ? ESCAPE '\\'
-         ORDER BY a.published_at DESC LIMIT ?`,
-        like,
-        like,
-        perPage
-      );
-
-      return { stories: await rowsToCards(storyRows), articles };
-    },
-
-    async getDigestStories(limit = 7) {
-      const rows = await db.all<StoryRow>(
-        `SELECT * FROM stories
-         WHERE updated_at >= datetime('now', '-24 hours')
-         ORDER BY hot_score DESC LIMIT ?`,
-        limit
-      );
-      return rowsToCards(rows);
-    },
-
-    async getSourcesWithStats() {
-      return db.all<SourceWithStats>(
-        `SELECT s.*,
-           (SELECT COUNT(*) FROM feeds f WHERE f.source_id = s.id AND f.active = 1) AS feed_count,
-           (SELECT COUNT(*) FROM feeds f WHERE f.source_id = s.id AND f.error_count > 0) AS feed_errors,
-           (SELECT COUNT(*) FROM articles a WHERE a.source_id = s.id) AS article_count,
-           (SELECT MAX(f.last_fetched_at) FROM feeds f WHERE f.source_id = s.id) AS last_fetched_at
-         FROM sources s
-         ORDER BY s.name`
-      ) as Promise<SourceWithStats[]>;
-    },
-
-    async getBookmarkedStories(userId: number) {
-      const rows = await db.all<StoryRow>(
-        `SELECT s.* FROM bookmarks b
-         JOIN stories s ON s.id = b.story_id
-         WHERE b.user_id = ?
-         ORDER BY b.created_at DESC`,
-        userId
-      );
-      return rowsToCards(rows);
-    },
-
-    async getRelatedStories(storyId: number, category: string, limit = 4) {
-      const rows = await db.all<StoryRow>(
-        `SELECT * FROM stories
-         WHERE category = ? AND id != ?
-         ORDER BY hot_score DESC LIMIT ?`,
-        category,
-        storyId,
-        limit
-      );
-      return rowsToCards(rows);
-    },
-
-    async getCategoryCounts() {
-      return db.all<{ category: string; c: number }>(
-        `SELECT category, COUNT(*) AS c FROM stories
-         WHERE updated_at >= datetime('now', '-48 hours')
-         GROUP BY category`
-      );
-    },
-  };
-
-  /** Helper: ambil sources untuk satu story (dipakai getStoryDetail & rowToCard — dipertahankan untuk detail) */
+  /** Helper: ambil sources untuk satu story */
   async function getStorySources(storyId: number): Promise<StorySourceRow[]> {
     return db.all<StorySourceRow>(
       `SELECT DISTINCT s.slug, s.name
@@ -265,6 +121,168 @@ export function makeQueries(db: Queryable) {
       storyId
     );
   }
+
+  // ── raw query implementations (no cache, no dedup) ──
+  const raw = {
+    async getTopStories(page = 1, perPage = PER_PAGE, category?: string) {
+      const where = category ? "WHERE s.category = ?" : "";
+      const params: unknown[] = category ? [category] : [];
+      const totalRow = await db.get<{ c: number }>(
+        `SELECT COUNT(*) AS c FROM stories s ${where}`, ...params
+      );
+      const rows = await db.all<StoryRow>(
+        `SELECT s.* FROM stories s ${where}
+         ORDER BY s.hot_score DESC, s.updated_at DESC
+         LIMIT ? OFFSET ?`,
+        ...params, perPage, (page - 1) * perPage
+      );
+      return { stories: await rowsToCards(rows), total: totalRow?.c ?? 0 };
+    },
+
+    async getStoryDetail(id: number) {
+      const story = await db.get<StoryRow>("SELECT * FROM stories WHERE id = ?", id);
+      if (!story) return null;
+      const analysis = (await db.get<AnalysisRow>("SELECT * FROM story_analysis WHERE story_id = ?", id)) ?? null;
+      const articles = await db.all<StoryDetail["articles"][number]>(
+        `SELECT a.*, s.name AS source_name, s.slug AS source_slug, s.character AS source_character
+         FROM story_articles sa JOIN articles a ON a.id = sa.article_id
+         JOIN sources s ON s.id = a.source_id
+         WHERE sa.story_id = ? ORDER BY a.published_at DESC`, id
+      );
+      return { story, analysis, articles, sources: await getStorySources(id) };
+    },
+
+    async getLatestArticles(page = 1, perPage = PER_PAGE, category?: string) {
+      const where = category ? "WHERE a.category = ?" : "";
+      const params: unknown[] = category ? [category] : [];
+      const totalRow = await db.get<{ c: number }>(
+        `SELECT COUNT(*) AS c FROM articles a ${where}`, ...params
+      );
+      const articles = await db.all<LatestArticle>(
+        `SELECT a.*, s.name AS source_name, s.slug AS source_slug
+         FROM articles a JOIN sources s ON s.id = a.source_id
+         ${where} ORDER BY a.published_at DESC LIMIT ? OFFSET ?`,
+        ...params, perPage, (page - 1) * perPage
+      );
+      return { articles, total: totalRow?.c ?? 0 };
+    },
+
+    async searchAll(q: string, perPage = 30) {
+      const escaped = q.replace(/[%_]/g, (m) => `\\\\${m}`);
+      const like = `%${escaped}%`;
+      const storyRows = await db.all<StoryRow>(
+        `SELECT * FROM stories WHERE title LIKE ? ESCAPE '\\\\' ORDER BY hot_score DESC LIMIT 10`, like
+      );
+      const articles = await db.all<LatestArticle>(
+        `SELECT a.*, s.name AS source_name, s.slug AS source_slug
+         FROM articles a JOIN sources s ON s.id = a.source_id
+         WHERE a.title LIKE ? ESCAPE '\\\\' OR a.description LIKE ? ESCAPE '\\\\'
+         ORDER BY a.published_at DESC LIMIT ?`, like, like, perPage
+      );
+      return { stories: await rowsToCards(storyRows), articles };
+    },
+
+    async getDigestStories(limit = 7) {
+      const rows = await db.all<StoryRow>(
+        `SELECT * FROM stories WHERE updated_at >= datetime('now', '-24 hours')
+         ORDER BY hot_score DESC LIMIT ?`, limit
+      );
+      return rowsToCards(rows);
+    },
+
+    async getSourcesWithStats() {
+      return db.all<SourceWithStats>(
+        `SELECT s.*,
+           (SELECT COUNT(*) FROM feeds f WHERE f.source_id = s.id AND f.active = 1) AS feed_count,
+           (SELECT COUNT(*) FROM feeds f WHERE f.source_id = s.id AND f.error_count > 0) AS feed_errors,
+           (SELECT COUNT(*) FROM articles a WHERE a.source_id = s.id) AS article_count,
+           (SELECT MAX(f.last_fetched_at) FROM feeds f WHERE f.source_id = s.id) AS last_fetched_at
+         FROM sources s ORDER BY s.name`
+      ) as Promise<SourceWithStats[]>;
+    },
+
+    async getBookmarkedStories(userId: number) {
+      const rows = await db.all<StoryRow>(
+        `SELECT s.* FROM bookmarks b JOIN stories s ON s.id = b.story_id
+         WHERE b.user_id = ? ORDER BY b.created_at DESC`, userId
+      );
+      return rowsToCards(rows);
+    },
+
+    async getRelatedStories(storyId: number, category: string, limit = 4) {
+      const rows = await db.all<StoryRow>(
+        `SELECT * FROM stories WHERE category = ? AND id != ?
+         ORDER BY hot_score DESC LIMIT ?`, category, storyId, limit
+      );
+      return rowsToCards(rows);
+    },
+
+    async getCategoryCounts() {
+      return db.all<{ category: string; c: number }>(
+        `SELECT category, COUNT(*) AS c FROM stories
+         WHERE updated_at >= datetime('now', '-48 hours') GROUP BY category`
+      );
+    },
+  };
+
+  // ── cached layer: React.cache() for request dedup + nextCache for cross-request persistence ──
+  return {
+    getTopStories: reactCache(
+      nextCache(
+        (page = 1, perPage = PER_PAGE, category?: string) => raw.getTopStories(page, perPage, category),
+        ['query-top-stories'],
+        { revalidate: 300, tags: ['stories'] }
+      )
+    ),
+
+    getStoryDetail: reactCache(
+      nextCache(
+        (id: number) => raw.getStoryDetail(id),
+        ['query-story-detail'],
+        { revalidate: 600, tags: ['stories'] }
+      )
+    ),
+
+    getLatestArticles: reactCache(
+      nextCache(
+        (page = 1, perPage = PER_PAGE, category?: string) => raw.getLatestArticles(page, perPage, category),
+        ['query-latest-articles'],
+        { revalidate: 60, tags: ['articles'] }
+      )
+    ),
+
+    searchAll: reactCache(
+      (q: string, perPage = 30) => raw.searchAll(q, perPage)
+    ),
+
+    getDigestStories: reactCache(
+      (limit = 7) => raw.getDigestStories(limit)
+    ),
+
+    getSourcesWithStats: nextCache(
+      () => raw.getSourcesWithStats(),
+      ['query-sources'],
+      { revalidate: 3600, tags: ['sources'] }
+    ),
+
+    getBookmarkedStories: (userId: number) => raw.getBookmarkedStories(userId),
+
+    getRelatedStories: reactCache(
+      nextCache(
+        (storyId: number, category: string, limit = 4) => raw.getRelatedStories(storyId, category, limit),
+        ['query-related-stories'],
+        { revalidate: 600, tags: ['stories'] }
+      )
+    ),
+
+    getCategoryCounts: reactCache(
+      nextCache(
+        () => raw.getCategoryCounts(),
+        ['query-category-counts'],
+        { revalidate: 300, tags: ['stories'] }
+      )
+    ),
+  };
 }
 
 export type Queries = ReturnType<typeof makeQueries>;

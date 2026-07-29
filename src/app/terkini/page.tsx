@@ -6,7 +6,7 @@ import { Pagination } from "@/components/Pagination";
 import { SourceAvatar } from "@/components/SourceChip";
 import { CategoryNav } from "@/components/CategoryNav";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 export const metadata: Metadata = { title: "Berita Terkini" };
 

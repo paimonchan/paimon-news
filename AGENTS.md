@@ -12,9 +12,16 @@ This version has breaking changes — APIs, conventions, and file structure may 
 Browser ──► Vercel Hobby ($0) ──► Supabase Free ($0)
                   ▲
                   │
-        GitHub Actions ($0) ── cron */15 ──► /api/cron/ingest?batchSize=7 (×4)
-                              ── cron 22:00 ─► /api/cron/digest
+        GitHub Actions ($0) ── cron */6h ──► scripts/ingest.ts (langsung ke DB)
+                              ── cron 22:00 ─► scripts/digest.ts (langsung ke DB + Resend)
                               ── cron */5  ──► /api/health (keep-alive)
+
+Alur ingest & digest (langsung dari GitHub Actions, tanpa Vercel):
+  GitHub Actions
+    ├─ checkout repo
+    ├─ npm ci
+    └─ npx tsx scripts/ingest.ts  ← langsung konek Supabase via DATABASE_URL
+    └─ npx tsx scripts/digest.ts  ← langsung konek Supabase + Resend API
 
 Semua $0/bulan:
 - Vercel Hobby: 60s timeout, 1M invocations/bulan, 100GB bandwidth
@@ -45,26 +52,33 @@ Semua $0/bulan:
 3. Set `NODE_ENV=production`
 4. AI & Mail opsional (kosongkan untuk fallback console)
 
-### 3. Create .github/workflows/ingest.yml
+### 3. GitHub Actions — Ingest Langsung ke DB
+
+⚠️ **Catatan:** `/api/cron/ingest` di Vercel sudah **DEPRECATED**. Ingest sekarang jalan langsung dari GitHub Actions via `scripts/ingest.ts`.
 
 ```yaml
 name: Ingest Berita
 on:
   schedule:
-    - cron: '*/15 * * * *'
+    - cron: '0 */6 * * *'
   workflow_dispatch:
 
 jobs:
   ingest:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        batch: [0, 1, 2, 3]
     steps:
-      - run: |
-          curl -s -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "${{ secrets.BASE_URL }}/api/cron/ingest?batchSize=7&batch=${{ matrix.batch }}" \
-            --max-time 55
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/ingest.ts
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          AI_API_KEY: ${{ secrets.AI_API_KEY }}
+          AI_BASE_URL: ${{ secrets.AI_BASE_URL }}
+          AI_MODEL: ${{ secrets.AI_MODEL }}
 ```
 
 ### 4. Create .github/workflows/digest.yml
@@ -110,6 +124,12 @@ Supabase Free auto-pause setelah 7 hari idle. Keepalive tiap 5 menit mencegah in
 Set di Settings → Secrets and variables → Actions:
 - `CRON_SECRET` — sama dengan yang di Vercel
 - `BASE_URL` — URL Vercel (https://...)
+- `DATABASE_URL` — koneksi Supabase (dipakai ingest & digest scripts)
+- `RESEND_API_KEY` — API key Resend (dipakai digest script)
+- `MAIL_FROM` — optional, default `Lensa <onboarding@resend.dev>`
+- `AI_API_KEY` — optional, untuk AI analysis saat ingest
+- `AI_BASE_URL` — optional
+- `AI_MODEL` — optional
 
 ## Catatan
 

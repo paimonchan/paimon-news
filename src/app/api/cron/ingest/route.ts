@@ -2,6 +2,12 @@ import { NextRequest } from "next/server";
 import { getContainer } from "@/infrastructure/container";
 import { cronAuthorized } from "../_auth";
 
+/**
+ * @deprecated Ingest sekarang jalan langsung dari GitHub Actions via scripts/ingest.ts
+ *             (lihat .github/workflows/ingest.yml).
+ *             Endpoint ini dipertahankan untuk backward compatibility — jangan dihapus
+ *             sampai semua workflow lama selesai migrasi.
+ */
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 // Batas durasi function (Vercel: sesuaikan plan; lokal/VPS tidak berpengaruh)

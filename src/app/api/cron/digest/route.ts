@@ -2,6 +2,11 @@ import { NextRequest } from "next/server";
 import { getContainer } from "@/infrastructure/container";
 import { cronAuthorized } from "../_auth";
 
+/**
+ * @deprecated Digest sekarang jalan langsung dari GitHub Actions via scripts/digest.ts
+ *             (lihat .github/workflows/digest.yml).
+ *             Endpoint ini dipertahankan untuk backward compatibility saja.
+ */
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 60;
