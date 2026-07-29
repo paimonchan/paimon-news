@@ -1,6 +1,6 @@
 import type { Queryable } from "../queryable";
 
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 
 const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS _migrations (
@@ -138,5 +138,44 @@ export async function runPgMigrations(db: Queryable): Promise<void> {
   if (current < SCHEMA_VERSION) {
     await db.run(SCHEMA_SQL);
     console.log(`[pg] Migrasi v${SCHEMA_VERSION} (schema awal) diterapkan.`);
+  }
+
+  // v4: Full-text search index (Postgres tsvector)
+  if (current < 4) {
+    await db.run(`
+      ALTER TABLE stories ADD COLUMN IF NOT EXISTS search_text TEXT;
+      ALTER TABLE articles ADD COLUMN IF NOT EXISTS search_text TEXT;
+
+      UPDATE stories SET search_text = title;
+      UPDATE articles SET search_text = COALESCE(title, '') || ' ' || COALESCE(description, '');
+
+      CREATE INDEX IF NOT EXISTS idx_stories_search ON stories USING GIN(to_tsvector('indonesian', search_text));
+      CREATE INDEX IF NOT EXISTS idx_articles_search ON articles USING GIN(to_tsvector('indonesian', search_text));
+
+      CREATE OR REPLACE FUNCTION trg_stories_search() RETURNS trigger AS $$
+      BEGIN
+        NEW.search_text := NEW.title;
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+
+      CREATE OR REPLACE FUNCTION trg_articles_search() RETURNS trigger AS $$
+      BEGIN
+        NEW.search_text := COALESCE(NEW.title, '') || ' ' || COALESCE(NEW.description, '');
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
+
+      DROP TRIGGER IF EXISTS trg_stories_search_insert ON stories;
+      CREATE TRIGGER trg_stories_search_insert
+        BEFORE INSERT OR UPDATE OF title ON stories
+        FOR EACH ROW EXECUTE FUNCTION trg_stories_search();
+
+      DROP TRIGGER IF EXISTS trg_articles_search_insert ON articles;
+      CREATE TRIGGER trg_articles_search_insert
+        BEFORE INSERT OR UPDATE OF title, description ON articles
+        FOR EACH ROW EXECUTE FUNCTION trg_articles_search();
+    `);
+    console.log("[pg] Migrasi v4 (Full-text search index) diterapkan.");
   }
 }

@@ -44,7 +44,7 @@ function sqlIn(items: number[]): string {
   return items.map(() => "?").join(",");
 }
 
-export function makeQueries(db: Queryable) {
+export function makeQueries(db: Queryable, ftsEnabled = false) {
   /** Batch: ubah banyak StoryRow → StoryCard dalam 2 query, bukan 3×N */
   async function rowsToCards(rows: StoryRow[]): Promise<StoryCard[]> {
     if (rows.length === 0) return [];
@@ -168,15 +168,31 @@ export function makeQueries(db: Queryable) {
     },
 
     async searchAll(q: string, perPage = 30) {
-      const escaped = q.replace(/[%_]/g, (m) => `\\\\${m}`);
+      if (ftsEnabled) {
+        // PostgreSQL tsvector full-text search
+        const storyRows = await db.all<StoryRow>(
+          `SELECT * FROM stories
+           WHERE to_tsvector('indonesian', search_text) @@ plainto_tsquery('indonesian', ?)
+           ORDER BY hot_score DESC LIMIT 10`, q
+        );
+        const articles = await db.all<LatestArticle>(
+          `SELECT a.*, s.name AS source_name, s.slug AS source_slug
+           FROM articles a JOIN sources s ON s.id = a.source_id
+           WHERE to_tsvector('indonesian', a.search_text) @@ plainto_tsquery('indonesian', ?)
+           ORDER BY a.published_at DESC LIMIT ?`, q, perPage
+        );
+        return { stories: await rowsToCards(storyRows), articles };
+      }
+      // SQLite fallback: LIKE search
+      const escaped = q.replace(/[%_]/g, (m) => `\\${m}`);
       const like = `%${escaped}%`;
       const storyRows = await db.all<StoryRow>(
-        `SELECT * FROM stories WHERE title LIKE ? ESCAPE '\\\\' ORDER BY hot_score DESC LIMIT 10`, like
+        `SELECT * FROM stories WHERE title LIKE ? ESCAPE '\\' ORDER BY hot_score DESC LIMIT 10`, like
       );
       const articles = await db.all<LatestArticle>(
         `SELECT a.*, s.name AS source_name, s.slug AS source_slug
          FROM articles a JOIN sources s ON s.id = a.source_id
-         WHERE a.title LIKE ? ESCAPE '\\\\' OR a.description LIKE ? ESCAPE '\\\\'
+         WHERE a.title LIKE ? ESCAPE '\\' OR a.description LIKE ? ESCAPE '\\'
          ORDER BY a.published_at DESC LIMIT ?`, like, like, perPage
       );
       return { stories: await rowsToCards(storyRows), articles };

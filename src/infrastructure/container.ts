@@ -57,7 +57,7 @@ function build() {
     cleanup,
   });
   const auth = makeAuth({ authRepo, mailer, baseUrl: config.baseUrl });
-  const queries = makeQueries(db);
+  const queries = makeQueries(db, !!config.databaseUrl);
   const digest = makeDigest({
     digestRepo,
     mailer,
