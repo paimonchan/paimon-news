@@ -496,11 +496,12 @@ export function makeAuthRepository(db: Queryable): AuthRepository {
     },
 
     createToken: async (token, email, expiresInMinutes) => {
+      const expiresAt = new Date(Date.now() + Math.floor(expiresInMinutes) * 60_000).toISOString();
       await db.run(
-        "INSERT INTO auth_tokens (token, email, expires_at, created_at) VALUES (?, ?, datetime('now', ?), datetime('now'))",
+        "INSERT INTO auth_tokens (token, email, expires_at, created_at) VALUES (?, ?, ?, datetime('now'))",
         token,
         email,
-        `+${Math.floor(expiresInMinutes)} minutes`
+        expiresAt
       );
     },
 
@@ -519,11 +520,12 @@ export function makeAuthRepository(db: Queryable): AuthRepository {
       );
       const user = await db.get<{ id: number }>("SELECT id FROM users WHERE email = ?", row.email);
       if (user) {
+        const sessionExpiresAt = new Date(Date.now() + Math.floor(sessionDays) * 86_400_000).toISOString();
         await db.run(
-          "INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, datetime('now', ?))",
+          "INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)",
           sessionToken,
           user.id,
-          `+${Math.floor(sessionDays)} days`
+          sessionExpiresAt
         );
         return row.email;
       }
