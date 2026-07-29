@@ -7,8 +7,6 @@ import { StoryCard } from "@/components/StoryCard";
 import { CategoryNav } from "@/components/CategoryNav";
 import { Pagination } from "@/components/Pagination";
 
-export const dynamic = "force-dynamic";
-
 export async function generateMetadata({
   params,
 }: {

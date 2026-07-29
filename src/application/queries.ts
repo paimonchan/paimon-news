@@ -38,46 +38,73 @@ export interface SourceWithStats extends SourceRow {
   last_fetched_at: string | null;
 }
 
+function sqlIn(items: number[]): string {
+  return items.map(() => "?").join(",");
+}
+
 export function makeQueries(db: Queryable) {
-  async function getStorySources(storyId: number): Promise<StorySourceRow[]> {
-    return db.all<StorySourceRow>(
-      `SELECT DISTINCT s.slug, s.name
+  /** Batch: ubah banyak StoryRow → StoryCard dalam 2 query, bukan 3×N */
+  async function rowsToCards(rows: StoryRow[]): Promise<StoryCard[]> {
+    if (rows.length === 0) return [];
+    const ids = rows.map((r) => r.id);
+
+    // Batch query 1: semua analysis untuk stories ini
+    const analyses = await db.all<{ story_id: number; neutral_summary: string }>(
+      `SELECT story_id, neutral_summary FROM story_analysis WHERE story_id IN (${sqlIn(ids)})`,
+      ...ids
+    );
+    const analysisMap = new Map(analyses.map((a) => [a.story_id, a.neutral_summary]));
+
+    // Batch query 2: representative article (image + description) per story
+    const reps = await db.all<{
+      story_id: number;
+      image_url: string | null;
+      description: string | null;
+    }>(
+      `SELECT sa.story_id, a.image_url, a.description
+       FROM story_articles sa
+       JOIN articles a ON a.id = sa.article_id
+       WHERE sa.story_id IN (${sqlIn(ids)})
+       ORDER BY a.image_url IS NOT NULL DESC, a.published_at DESC`,
+      ...ids
+    );
+    const repMap = new Map<number, { image_url: string | null; description: string | null }>();
+    for (const r of reps) {
+      if (!repMap.has(r.story_id)) repMap.set(r.story_id, r);
+    }
+
+    // Batch query 3: sources per story
+    const allSources = await db.all<{ story_id: number; slug: string; name: string }>(
+      `SELECT sa.story_id, s.slug, s.name
        FROM story_articles sa
        JOIN articles a ON a.id = sa.article_id
        JOIN sources s ON s.id = a.source_id
-       WHERE sa.story_id = ?
+       WHERE sa.story_id IN (${sqlIn(ids)})
        ORDER BY s.name`,
-      storyId
+      ...ids
     );
-  }
+    const sourceMap = new Map<number, StorySourceRow[]>();
+    for (const s of allSources) {
+      if (!sourceMap.has(s.story_id)) sourceMap.set(s.story_id, []);
+      sourceMap.get(s.story_id)!.push(s);
+    }
 
-  async function rowToCard(row: StoryRow): Promise<StoryCard> {
-    const analysis = await db.get<Pick<AnalysisRow, "neutral_summary">>(
-      "SELECT neutral_summary FROM story_analysis WHERE story_id = ?",
-      row.id
-    );
-
-    const rep = await db.get<{ description: string | null; image_url: string | null }>(
-      `SELECT a.description, a.image_url FROM story_articles sa
-       JOIN articles a ON a.id = sa.article_id
-       WHERE sa.story_id = ?
-       ORDER BY (a.image_url IS NOT NULL) DESC, a.published_at DESC
-       LIMIT 1`,
-      row.id
-    );
-
-    return {
-      id: row.id,
-      title: row.title,
-      category: row.category,
-      updated_at: row.updated_at,
-      article_count: row.article_count,
-      source_count: row.source_count,
-      hot_score: row.hot_score,
-      image_url: rep?.image_url ?? null,
-      summary: analysis?.neutral_summary ?? (excerpt(rep?.description, 240) || null),
-      sources: await getStorySources(row.id),
-    };
+    return rows.map((row) => {
+      const rep = repMap.get(row.id);
+      const summary = analysisMap.get(row.id) ?? null;
+      return {
+        id: row.id,
+        title: row.title,
+        category: row.category,
+        updated_at: row.updated_at,
+        article_count: row.article_count,
+        source_count: row.source_count,
+        hot_score: row.hot_score,
+        image_url: rep?.image_url ?? null,
+        summary: summary ?? (excerpt(rep?.description, 240) || null),
+        sources: sourceMap.get(row.id) ?? [],
+      };
+    });
   }
 
   return {
@@ -99,14 +126,16 @@ export function makeQueries(db: Queryable) {
         (page - 1) * perPage
       );
 
-      return { stories: await Promise.all(rows.map(rowToCard)), total: totalRow?.c ?? 0 };
+      return { stories: await rowsToCards(rows), total: totalRow?.c ?? 0 };
     },
 
     async getStoryDetail(id: number) {
       const story = await db.get<StoryRow>("SELECT * FROM stories WHERE id = ?", id);
       if (!story) return null;
 
-      const analysis = (await db.get<AnalysisRow>("SELECT * FROM story_analysis WHERE story_id = ?", id)) ?? null;
+      const analysis =
+        (await db.get<AnalysisRow>("SELECT * FROM story_analysis WHERE story_id = ?", id)) ??
+        null;
 
       const articles = await db.all<
         StoryDetail["articles"][number]
@@ -167,7 +196,7 @@ export function makeQueries(db: Queryable) {
         perPage
       );
 
-      return { stories: await Promise.all(storyRows.map(rowToCard)), articles };
+      return { stories: await rowsToCards(storyRows), articles };
     },
 
     async getDigestStories(limit = 7) {
@@ -177,7 +206,7 @@ export function makeQueries(db: Queryable) {
          ORDER BY hot_score DESC LIMIT ?`,
         limit
       );
-      return Promise.all(rows.map(rowToCard));
+      return rowsToCards(rows);
     },
 
     async getSourcesWithStats() {
@@ -200,7 +229,7 @@ export function makeQueries(db: Queryable) {
          ORDER BY b.created_at DESC`,
         userId
       );
-      return Promise.all(rows.map(rowToCard));
+      return rowsToCards(rows);
     },
 
     async getRelatedStories(storyId: number, category: string, limit = 4) {
@@ -212,7 +241,7 @@ export function makeQueries(db: Queryable) {
         storyId,
         limit
       );
-      return Promise.all(rows.map(rowToCard));
+      return rowsToCards(rows);
     },
 
     async getCategoryCounts() {
@@ -223,6 +252,19 @@ export function makeQueries(db: Queryable) {
       );
     },
   };
+
+  /** Helper: ambil sources untuk satu story (dipakai getStoryDetail & rowToCard — dipertahankan untuk detail) */
+  async function getStorySources(storyId: number): Promise<StorySourceRow[]> {
+    return db.all<StorySourceRow>(
+      `SELECT DISTINCT s.slug, s.name
+       FROM story_articles sa
+       JOIN articles a ON a.id = sa.article_id
+       JOIN sources s ON s.id = a.source_id
+       WHERE sa.story_id = ?
+       ORDER BY s.name`,
+      storyId
+    );
+  }
 }
 
 export type Queries = ReturnType<typeof makeQueries>;

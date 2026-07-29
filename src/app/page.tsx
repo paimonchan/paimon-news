@@ -8,8 +8,6 @@ import { SubscribeForm } from "@/components/SubscribeForm";
 import { ingestNowAction } from "./actions";
 import { categoryLabel } from "@/domain/categorize";
 
-export const dynamic = "force-dynamic";
-
 export default async function HomePage({
   searchParams,
 }: {

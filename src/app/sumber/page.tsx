@@ -3,7 +3,7 @@ import { getContainer } from "@/infrastructure/container";
 import { timeAgo } from "@/app/_lib/format";
 import { SourceAvatar } from "@/components/SourceChip";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 3600;
 
 export const metadata: Metadata = { title: "Daftar Sumber" };
 
