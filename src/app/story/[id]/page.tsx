@@ -35,7 +35,7 @@ export async function generateMetadata({
       type: "article",
       siteName: "Lensa",
       ...(image ? { images: [{ url: image, width: 1200, height: 630 }] } : {}),
-      publishedTime: articles.length > 0 ? articles[articles.length - 1].published_at : undefined,
+      publishedTime: articles.length > 0 ? (articles[articles.length - 1].published_at ?? undefined) : undefined,
       modifiedTime: story.updated_at,
     },
     twitter: {
@@ -92,7 +92,7 @@ export default async function StoryPage({
             ...(articles.find((a) => a.image_url)?.image_url
               ? { image: articles.find((a) => a.image_url)!.image_url }
               : {}),
-            datePublished: articles.length > 0 ? articles[articles.length - 1].published_at : undefined,
+            datePublished: articles.length > 0 ? (articles[articles.length - 1].published_at ?? undefined) : undefined,
             dateModified: story.updated_at,
             author: articles
               .filter((a, i, arr) => arr.findIndex((b) => b.source_slug === a.source_slug) === i)
