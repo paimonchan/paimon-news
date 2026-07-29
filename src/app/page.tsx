@@ -13,9 +13,9 @@ export const dynamic = "force-dynamic";
 export default async function HomePage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; ingested?: string }>;
+  searchParams: Promise<{ page?: string; ingested?: string; ok?: string; error?: string }>;
 }) {
-  const { page: pageStr, ingested } = await searchParams;
+  const { page: pageStr, ingested, ok, error } = await searchParams;
   const page = Math.max(1, Number(pageStr) || 1);
   const { queries } = getContainer();
   const { stories, total } = await queries.getTopStories(page);
@@ -56,6 +56,16 @@ export default async function HomePage({
                 noise.
               </p>
               <SubscribeForm back="/" compact />
+              {ok && (
+                <p className="mt-3 text-sm font-medium text-emerald-700 dark:text-emerald-400">
+                  ✓ Berhasil! Cek email kamu untuk konfirmasi.
+                </p>
+              )}
+              {error === "email" && (
+                <p className="mt-3 text-sm font-medium text-red-600">
+                  Alamat email tidak valid.
+                </p>
+              )}
             </section>
 
             <section className="rounded-2xl border border-stone-200 p-5 dark:border-stone-800">
