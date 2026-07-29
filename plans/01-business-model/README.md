@@ -1,25 +1,25 @@
 # 01 — Business Model
 
 ## Revenue Streams
-- [ ] **Iklan** — display ads / native ads
-- [ ] **Langganan (Premium)** — fitur eksklusif, tanpa iklan
-- [ ] **Afiliasi** — referral link ke sumber berita
-- [ ] **Sponsored content / newsletter**
-- [ ] Lainnya: ...
+- [ ] **Iklan** — display ads / native ads (masih opsi)
+- [ ] **Langganan (Premium)** — fitur eksklusif, tanpa iklan (masih opsi)
+- [ ] **Donasi / Saweria** — opsi paling realistis untuk skala kecil
+- [ ] **Newsletter sponsorship** — jika subscriber sudah banyak
+- Catatan: Saat ini **0 revenue** — fokus ke growth & kualitas konten dulu.
 
-## Cost Structure
+## Cost Structure (Aktual)
 | Item | Estimasi/bln | Notes |
 |------|-------------|-------|
-| Server/Hosting | | |
-| API (LLM summarization) | | |
-| Domain & SSL | | |
-| Scraping infra | | |
-
-## Pricing Strategy
-> *Kalau ada tier premium, berapa harganya dan apa bedanya dengan free?*
+| Vercel Hobby | $0 | Free tier |
+| Supabase Free | $0 | 500MB Postgres |
+| GitHub Actions | $0 | 2000 min/bulan |
+| Domain | $0 | pake .vercel.app dulu |
+| AI API | $0 | Heuristic fallback, AI optional |
+| Resend | $0 | 100 email/hari free |
+| **Total** | **$0/bln** | |
 
 ## Key Metrics
-- Monthly Active Users (MAU)
-- Retention rate
-- Cost per summary
-- Revenue per user
+- Monthly Active Users (MAU) — belum di-track
+- Retention rate — belum
+- Jumlah subscriber digest
+- Cost per summary — $0 (heuristic)

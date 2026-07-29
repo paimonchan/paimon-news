@@ -1,58 +1,77 @@
-# 03 — Tech Architecture
+# 03 — Tech Architecture (Aktual)
 
-## Stack Options
-
-### Frontend
-- [ ] **Next.js / Nuxt** — SSR bagus untuk SEO berita
-- [ ] **SvelteKit** — lightweight, fast
-- [ ] **Astro** — static-first, cocok content site
-- [ ] Lainnya: ...
-
-### Backend
-- [ ] **FastAPI (Python)** — cocok untuk ML/AI integration
-- [ ] **Node.js (Express/Hono)** — ringan, cepat
-- [ ] **Go** — performa scraping tinggi
-- [ ] Lainnya: ...
+## Stack Final
+### Frontend & Backend
+- **Next.js 16.2.11** (App Router) — SSR sekaligus API routes
+- **TypeScript** strict
+- **Tailwind CSS** styling
 
 ### Database
-- [ ] **PostgreSQL** — relational, mature
-- [ ] **SQLite** — simple untuk MVP
-- [ ] **MongoDB** — flexible schema
+- **PostgreSQL (Supabase Free)** — produksi
+- **SQLite (better-sqlite3)** — development lokal
+- **Adapter layer** (`src/infrastructure/db/postgres/adapter.ts`) — translasi otomatis SQLite → PostgreSQL (`datetime()` → `NOW()`, `INSERT OR IGNORE` → `ON CONFLICT DO NOTHING`)
 
-## Scraping Pipeline
+### Hosting
+- **Vercel Hobby** ($0) — 60s timeout, 1M invocations/bulan
+- **Supabase Free** ($0) — 500MB Postgres, 5GB egress
+
+### Scheduler (Cron)
+- **GitHub Actions** ($0) — 2000 min/bulan
+  - `scripts/ingest.ts` — ambil RSS tiap 6 jam (langsung ke DB, bukan via Vercel cron)
+  - `scripts/digest.ts` — kirim email harian jam 22:00 WIB
+  - `keepalive` — ping /api/health tiap 5 menit (cegah Supabase auto-pause)
+
+### Scraping Pipeline
 ```
-[Sumber Berita] → [Scraper] → [Parser/Normalizer] → [LLM Summary] → [Database] → [API/Web]
+[28 RSS Feed] → [fetchFeed dengan conditional GET] → [Normalize] → [Cluster (token-Jaccard)] → [Analysis (heuristik/AI)] → [Postgres DB]
 ```
 
-### Scraping Approach
-- [ ] **RSS/Atom feeds** — recommended (legal, terstruktur)
-- [ ] **HTML scraping** (BeautifulSoup / Playwright) — untuk yg gak punya RSS
-- [ ] **API pihak ketiga** — NewsAPI, Bing News, etc.
+### Analisis
+- **Default:** Heuristic — common-sentence extraction + distinctive token analysis
+- **Opsional:** AI (OpenAI-compatible, JSON mode) jika AI_API_KEY di-set
 
-### Anti-Blocking Strategy
-- Rotate User-Agent
-- Rate limiting (jangan banjiri server sumber)
-- Proxy rotation (kalau perlu)
+### Auth
+- Magic link via email (Resend API)
+- Stateless session via encrypted cookies (`next/headers`)
+- Rate-limited token creation
 
-## Summarization Engine
-- **Model LLM lokal** (Llama, Mistral via Ollama/vLLM) — gratis, privasi
-- **API LLM** (OpenAI, Claude, DeepSeek) — lebih akurat, ada biaya
-- **Hybrid** — pakai lokal untuk daily, API untuk deep dive
+### Email
+- **Resend** — free 100 email/hari
+- Fallback ke console.log jika RESEND_API_KEY tidak di-set
 
-## Infrastructure
-- **VPS** (DigitalOcean, Linode, Hetzner)
-- **Cloud** (AWS/GCP/Azure — scalable tapi lebih mahal)
-- **Serverless** (Cloudflare Workers + Pages — cocok untuk skala kecil)
-
-## Tech Diagram (Basic)
+## Tech Diagram
 ```
-┌─────────────┐    ┌──────────┐    ┌─────────────┐    ┌──────────┐
-│ RSS Feeds   │───▶│ Scraper  │───▶│ LLM Summary │───▶│ Database │
-│ HTML Scrape │    │ Scheduler│    │ Engine      │    │          │
-└─────────────┘    └──────────┘    └─────────────┘    └────┬─────┘
-                                                            │
-                     ┌──────────┐    ┌──────────┐           │
-                     │ Web UI   │◀───│ API      │◀──────────┘
-                     │ (Next.js)│    │ (FastAPI)│
-                     └──────────┘    └──────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                   GitHub Actions (Cron)                       │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐    │
+│  │ scripts/     │  │ scripts/     │  │ /api/health     │    │
+│  │ ingest.ts    │  │ digest.ts    │  │ (keepalive)     │    │
+│  │ (tiap 6 jam) │  │ (22:00 WIB)  │  │ (tiap 5 menit)  │    │
+│  └──────┬───────┘  └──────┬───────┘  └────────┬─────────┘    │
+└─────────┼─────────────────┼───────────────────┼──────────────┘
+          │                 │                   │
+          ▼                 ▼                   │
+┌──────────────────────────────────────────────┐│
+│              Supabase Postgres               │◄┘
+│  ┌─────────┐ ┌─────────┐ ┌───────────────┐   │
+│  │stories  │ │articles │ │auth_tokens     │   │
+│  │sources  │ │feeds    │ │sessions        │   │
+│  │analysis │ │bookmarks│ │digest_sub      │   │
+│  └─────────┘ └─────────┘ └───────────────┘   │
+└─────────────────────┬────────────────────────┘
+                      │
+                      ▼
+┌──────────────────────────────────┐
+│         Vercel (Next.js)         │
+│  ┌────────┐  ┌────────┐  ┌────┐ │
+│  │ /page  │  │/story/ │  │/api│ │
+│  │(feed)  │  │[id]    │  │/*  │ │
+│  └────────┘  └────────┘  └────┘ │
+│   SSR + unstable_cache caching  │
+└──────────────────────────────────┘
+          │
+          ▼
+┌─────────────────────┐
+│   Browser (User)    │
+└─────────────────────┘
 ```

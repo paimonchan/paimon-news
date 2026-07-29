@@ -1,42 +1,43 @@
-# 07 — Timeline & Milestones
+# 07 — Timeline & Milestones (Aktual)
 
-## Phase 0: Research (Minggu 1)
-- [ ] Riset kompetitor
-- [ ] Tentukan sumber berita awal
-- [ ] Fix stack technology
-- [ ] Setup repo dan dev environment
+## Phase 0: Research ✅ (Selesai)
+- [x] Riset kompetitor
+- [x] Tentukan sumber berita awal (11 portal, 28 feed)
+- [x] Fix stack: Next.js + PostgreSQL + Vercel + GH Actions
+- [x] Setup repo dan dev environment
 
-## Phase 1: MVP (Minggu 2-4)
-- [ ] Scraper untuk 3-5 sumber berita
-- [ ] Integrasi LLM summarization
-- [ ] Database schema
-- [ ] API endpoint (feed, search)
-- [ ] Frontend sederhana (Next.js)
-- [ ] Deploy ke production
+## Phase 1: MVP ✅ (Selesai)
+- [x] Scraper untuk 28 RSS feed
+- [x] Integrasi clustering (token-Jaccard)
+- [x] Database schema (SQLite → PostgreSQL)
+- [x] API routes (feed, search, auth, digest)
+- [x] Frontend: feed, kategori, terkini, cari, bookmark
+- [x] Deploy ke Vercel
 
-## Phase 2: Polish (Minggu 5-6)
-- [ ] UI/UX improvement
-- [ ] Dark mode
-- [ ] Kategori dan filter
-- [ ] Mobile responsive optimal
-- [ ] Performance optimization
+## Phase 2: Polish ✅ (Selesai)
+- [x] UI/UX improvement
+- [x] Dark mode toggle
+- [x] Kategori dan filter
+- [x] Mobile responsive
+- [x] Performance: unstable_cache, Suspense, batch query
+- [x] Auth: magic link login
+- [x] Digest email harian
 
-## Phase 3: Launch (Minggu 7-8)
-- [ ] Soft launch ke circle terdekat
-- [ ] Fix feedback dan bug
-- [ ] SEO setup
-- [ ] Social media channels
-- [ ] Public launch
+## Phase 3: SEO ✅ (Selesai)
+- [x] OG tags, Twitter Cards, JSON-LD NewsArticle
+- [x] Sitemap.xml, robots.txt, canonical URL
+- [x] Image remotePatterns untuk 11 portal
+- [x] metadataBase
 
-## Phase 4: Growth (Bulan 3+)
-- [ ] Premium tier
-- [ ] Newsletters
-- [ ] Lebih banyak sumber
-- [ ] Community features
-- [ ] Monetization aktif
+## Phase 4: Growth & Monetisasi (Sedang Berjalan)
+- [ ] FTS search (Postgres tsvector)
+- [ ] Custom OG image generator
+- [ ] Premium tier / donasi
+- [ ] Target 100 pengguna aktif harian
+- [ ] Broadcast ke sosial media
 
 ## Milestone Tracker
-- [ ] **M1:** Scraping + summarization jalan
-- [ ] **M2:** Web MVP bisa diakses publik
+- [x] **M1:** Scraping + summarization jalan
+- [x] **M2:** Web MVP bisa diakses publik → **paimon-news.vercel.app**
 - [ ] **M3:** 100 pengguna aktif harian
 - [ ] **M4:** Revenue positif (break-even)

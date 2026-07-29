@@ -1,31 +1,27 @@
-# 04 — Content Sources
+# 04 — Content Sources (Aktual)
 
-## Daftar Sumber Berita
+## Sumber Berita Terkini
+**28 RSS feed dari 11 portal:**
 
-### Sumber Awal (MVP)
-| Sumber | URL | Jenis | Kategori | Metode |
-|--------|-----|-------|----------|--------|
-| Contoh: Kompas | kompas.com | Portal Berita | Umum | RSS |
-| Contoh: TechCrunch | techcrunch.com | Tech | Teknologi | RSS |
-| | | | | |
+### Portal Umum
+1. **Detik.com** — detikNews, detikFinance, detikNet, detikHot, detikSport, detikOto, detikTravel, detikFood, detikHealth, Wolipop
+2. **CNN Indonesia** — nasional, internasional, ekonomi, teknologi, olahraga, hiburan, gaya hidup
+3. **Kompas.com** — megapolitan, nasional
+4. **Tempo.co** — nasional
+5. **CNBC Indonesia** — market
+6. **Media Indonesia** — nasional
+7. **Antara News** — umum
+8. **Tribun News** — nasional
+9. **Okezone** — news
+10. **Sindonews** — nasional
+11. **RMOL.id** — nasional
 
-### Kategori Berita
-- [ ] Teknologi
-- [ ] Ekonomi/Bisnis
-- [ ] Politik
-- [ ] Olahraga
-- [ ] Lifestyle
-- [ ] Science
-- [ ] Internasional
-- [ ] Lainnya: ...
+## Kriteria Pemilihan
+- Portal berita mainstream Indonesia
+- RSS feed tersedia dan stabil
+- Cakupan topik yang luas
 
-## Frekuensi Update
-- **Real-time** → untuk sumber RSS (setiap X menit)
-- **Terjadwal** → scraping harian / tiap beberapa jam
-- **On-demand** → user request ringkasan artikel tertentu
-
-## Content Curation
-- [ ] Apakah kita perlu moderasi konten?
-- [ ] Whitelist / blacklist sumber
-- [ ] Filter clickbait
-- [ ] Deduplikasi berita sama dari sumber beda
+## Proses
+- RSS di-fetch tiap 6 jam via GitHub Actions (conditional GET — hemat bandwidth)
+- HTML di-extract, dinormalisasi, lalu di-cluster
+- Duplikat lintas portal otomatis terdeteksi via Jaccard similarity
