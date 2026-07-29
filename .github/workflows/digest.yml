@@ -8,6 +8,14 @@ jobs:
   digest:
     runs-on: ubuntu-latest
     steps:
-      - run: |
-          curl -s -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "${{ secrets.BASE_URL }}/api/cron/digest" --max-time 55
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx tsx scripts/digest.ts
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          MAIL_FROM: ${{ secrets.MAIL_FROM }}
