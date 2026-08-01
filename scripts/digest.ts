@@ -1,7 +1,9 @@
 import { getContainer } from "../src/infrastructure/container";
+import { config } from "../src/infrastructure/config";
 
 async function main() {
   console.log("[digest] Starting...");
+  console.log("[digest] baseUrl:", config.baseUrl);
 
   const container = getContainer();
 
