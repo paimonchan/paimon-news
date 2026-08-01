@@ -47,7 +47,7 @@ Semua $0/bulan:
    ```
    DATABASE_URL=postgresql://...
    CRON_SECRET=<random-string>
-   BASE_URL=https://paimon-news.vercel.app
+   BASE_URL=https://www.paimonchan.com
    ```
 3. Set `NODE_ENV=production`
 4. AI & Mail opsional (kosongkan untuk fallback console)
