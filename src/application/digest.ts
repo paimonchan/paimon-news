@@ -3,48 +3,32 @@
 import crypto from "node:crypto";
 import type { DigestRepository, Mailer } from "./ports";
 import type { StoryCard } from "@/domain/entities";
-import { escapeHtml } from "@/domain/text";
+import { emailLayout, storyBlock, unsubscribeLink } from "@/infrastructure/mail/template";
 
 export function buildDigestHtml(
   stories: StoryCard[],
   baseUrl: string,
   unsubscribeToken?: string
 ): string {
-  const items = stories
-    .map(
-      (s, i) => `
-      <div style="margin:0 0 24px;padding:0 0 20px;border-bottom:1px solid #eee">
-        <div style="font-size:12px;color:#b45309;font-weight:600;text-transform:uppercase;letter-spacing:.05em">
-          #${i + 1} &middot; ${s.source_count} sumber
-        </div>
-        <a href="${baseUrl}/story/${s.id}"
-           style="font-size:17px;font-weight:700;color:#111;text-decoration:none;line-height:1.35">
-          ${escapeHtml(s.title)}
-        </a>
-        ${s.summary ? `<p style="color:#444;font-size:14px;line-height:1.6;margin:8px 0 6px">${escapeHtml(s.summary)}</p>` : ""}
-        <div style="font-size:12px;color:#888">
-          ${s.sources.map((src) => escapeHtml(src.name)).join(" &middot; ")}
-        </div>
-      </div>`
-    )
-    .join("");
+  const items = stories.map((s, i) => storyBlock(s, i, baseUrl)).join("");
 
   const unsub =
-    unsubscribeToken != null
-      ? `<p style="color:#999;font-size:12px;margin-top:32px">
-           <a href="${baseUrl}/berhenti?token=${encodeURIComponent(unsubscribeToken)}">Berhenti berlangganan</a>
-         </p>`
-      : "";
+    unsubscribeToken != null ? unsubscribeLink(baseUrl, unsubscribeToken) : "";
 
-  return `
-    <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px">
-      <h1 style="font-size:22px;margin:0 0 4px">&#9749; Digest Lensa</h1>
-      <p style="color:#666;margin:0 0 28px;font-size:14px">
-        ${stories.length} peristiwa terpanas 24 jam terakhir &mdash; satu peristiwa, semua sudut pandang.
+  const topTitles = stories.slice(0, 3).map((s) => s.title).join(" · ");
+
+  return emailLayout({
+    preheader: `${stories.length} peristiwa terpanas 24 jam terakhir — ${topTitles}`,
+    title: `Digest pagi, ${stories.length} peristiwa terpanas`,
+    content: `
+      <p style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#44403c;font-size:14px;line-height:1.7;margin:0 0 8px;">
+        Satu peristiwa, semua sudut pandang. Berikut ${stories.length} peristiwa yang paling banyak diberitakan 24 jam terakhir &mdash; dirangkum netral, tanpa bias.
       </p>
       ${items}
       ${unsub}
-    </div>`;
+    `,
+    footerNote: "Dikirim otomatis oleh Lensa.",
+  });
 }
 
 export function makeDigest(deps: {
@@ -86,17 +70,21 @@ export function makeDigest(deps: {
 
       await mailer.send({
         to: email,
-        subject: "Berlangganan Digest Lensa aktif",
-        html: `
-          <div style="font-family:sans-serif;max-width:480px">
-            <h2>Selamat datang di Digest Lensa &#9749;</h2>
-            <p>Mulai besok pagi, kamu akan menerima ringkasan 7 berita terpanas dari berbagai sumber &mdash; netral, tanpa noise.</p>
-            <p style="color:#666;font-size:13px">
-              Tidak merasa mendaftar?
-              <a href="${baseUrl}/berhenti?token=${token}">Berhenti berlangganan</a>.
+        subject: "Langganan Digest Lensa aktif",
+        html: emailLayout({
+          preheader: "Kamu terdaftar di Digest Lensa. Mulai besok pagi, ringkasan 7 berita terpanas masuk ke inbox kamu.",
+          title: "Selamat datang di Lensa 👋",
+          content: `
+            <p style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#44403c;font-size:14px;line-height:1.7;margin:0 0 16px;">
+              Terima kasih sudah berlangganan <strong>Digest Lensa</strong>. Setiap pagi, kamu akan menerima ringkasan
+              7 berita terpanas dari berbagai portal &mdash; dirangkum netral, lengkap dengan sudut pandang tiap media.
             </p>
-          </div>
-        `,
+            <p style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#44403c;font-size:14px;line-height:1.7;margin:0 0 24px;">
+              Baca berita hari ini kapan saja di <a href="${baseUrl}" style="color:#b45309;">lensa</a>.
+            </p>
+          `,
+          footerNote: "Tidak merasa mendaftar?",
+        }),
         textFallback: "Langganan Digest Lensa aktif. Terima kasih!",
       });
     },
