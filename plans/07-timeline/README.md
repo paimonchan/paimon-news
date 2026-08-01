@@ -38,6 +38,6 @@
 
 ## Milestone Tracker
 - [x] **M1:** Scraping + summarization jalan
-- [x] **M2:** Web MVP bisa diakses publik → **paimon-news.vercel.app**
+- [x] **M2:** Web MVP bisa diakses publik → **www.paimonchan.com**
 - [ ] **M3:** 100 pengguna aktif harian
 - [ ] **M4:** Revenue positif (break-even)
