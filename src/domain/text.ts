@@ -107,3 +107,21 @@ export function excerpt(text: string | null | undefined, max = 220): string {
   if (clean.length <= max) return clean;
   return clean.slice(0, max).replace(/\s+\S*$/, "") + "…";
 }
+
+/** Bersihkan ringkasan untuk email/tampilan: buang URL mentah & ekor boilerplate media. */
+export function cleanSummary(text: string | null | undefined, max = 240): string {
+  if (!text) return "";
+  let clean = text
+    .replace(/https?:\/\/\S+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  // Buang ekor boilerplate seperti "Baca selengkapnya di ..." / "Baca juga: ..." / "Simak selengkapnya..."
+  clean = clean
+    .replace(
+      /\s*(?:baca|lihat|simak)\s+(?:selengkapnya|juga)?\s*(?:di|pada)?\s*[^.!?]*[.!?]?$/i,
+      ""
+    )
+    .replace(/\s+[.!?]+\s*$/, "")
+    .trim();
+  return excerpt(clean, max);
+}

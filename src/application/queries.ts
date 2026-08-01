@@ -1,5 +1,5 @@
 import type { Queryable } from "@/infrastructure/db/queryable";
-import { excerpt } from "@/domain/text";
+import { excerpt, tokenize, overlapCoefficient } from "@/domain/text";
 import type {
   AnalysisRow,
   ArticleRow,
@@ -57,27 +57,49 @@ export function makeQueries(db: Queryable, ftsEnabled = false) {
     );
     const analysisMap = new Map(analyses.map((a) => [a.story_id, a.neutral_summary]));
 
-    // Batch query 2: representative article (image + description) per story
+    // Batch query 2: semua artikel per story (untuk pilih yang paling relevan dengan judul)
     const reps = await db.all<{
       story_id: number;
+      title: string;
       image_url: string | null;
       description: string | null;
     }>(
-      `SELECT sa.story_id, a.image_url, a.description
+      `SELECT sa.story_id, a.title, a.image_url, a.description
        FROM story_articles sa
        JOIN articles a ON a.id = sa.article_id
        WHERE sa.story_id IN (${sqlIn(ids)})
-       ORDER BY a.image_url IS NOT NULL DESC, a.published_at DESC`,
+       ORDER BY a.published_at DESC`,
       ...ids
     );
-    const repMap = new Map<number, { image_url: string | null; description: string | null }>();
+    const repByStory = new Map<number, typeof reps>();
     for (const r of reps) {
-      if (!repMap.has(r.story_id)) repMap.set(r.story_id, r);
+      if (!repByStory.has(r.story_id)) repByStory.set(r.story_id, []);
+      repByStory.get(r.story_id)!.push(r);
     }
 
-    // Batch query 3: sources per story
+    // Pilih artikel representatif: skor overlap token dengan judul story (cegah summary mismatch),
+    // tie-break: punya gambar → terbaru.
+    function pickRep(storyTitle: string, list: typeof reps): (typeof reps)[number] | undefined {
+      const titleTokens = tokenize(storyTitle);
+      let best: (typeof reps)[number] | undefined;
+      let bestScore = -1;
+      for (const a of list) {
+        if (!a.description || a.description.length < 40) continue;
+        const score = overlapCoefficient(
+          titleTokens,
+          tokenize(`${a.title} ${a.description.slice(0, 300)}`)
+        );
+        if (score > bestScore) {
+          bestScore = score;
+          best = a;
+        }
+      }
+      return best ?? list.find((a) => a.image_url) ?? list[0];
+    }
+
+    // Batch query 3: sources per story (DISTINCT — satu sumber sekali, walau banyak artikelnya)
     const allSources = await db.all<{ story_id: number; slug: string; name: string }>(
-      `SELECT sa.story_id, s.slug, s.name
+      `SELECT DISTINCT sa.story_id, s.slug, s.name
        FROM story_articles sa
        JOIN articles a ON a.id = sa.article_id
        JOIN sources s ON s.id = a.source_id
@@ -92,7 +114,7 @@ export function makeQueries(db: Queryable, ftsEnabled = false) {
     }
 
     return rows.map((row) => {
-      const rep = repMap.get(row.id);
+      const rep = pickRep(row.title, repByStory.get(row.id) ?? []);
       const summary = analysisMap.get(row.id) ?? null;
       return {
         id: row.id,

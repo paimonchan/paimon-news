@@ -2,7 +2,7 @@
 // Best practice email: layout table-based (bukan flex/grid), inline style,
 // bulletproof button (border-radius + padding di <a>), MSO conditional untuk Outlook.
 
-import { escapeHtml } from "@/domain/text";
+import { escapeHtml, cleanSummary } from "@/domain/text";
 
 // ── Design tokens ──────────────────────────────────────────────
 const COLORS = {
@@ -122,6 +122,20 @@ export function storyBlock(
   baseUrl: string
 ): string {
   const rank = index + 1;
+  // Sumber unik (defensif walau query sudah DISTINCT), tampilkan maks 5 + "+N lainnya"
+  const seen = new Set<string>();
+  const unique = story.sources.filter((s) => {
+    const key = s.name.trim().toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  const shown = unique.slice(0, 5);
+  const extra = unique.length - shown.length;
+  const sourcesHtml =
+    shown.map((s) => escapeHtml(s.name)).join(" &middot; ") +
+    (extra > 0 ? ` &middot; +${extra} lainnya` : "");
+  const summary = cleanSummary(story.summary);
   return `
   <div class="story-block" style="padding:20px 0;border-top:1px solid ${COLORS.border};">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
@@ -132,9 +146,9 @@ export function storyBlock(
              style="font-family:${FONT_STACK};font-size:17px;font-weight:700;color:${COLORS.ink};text-decoration:none;line-height:1.4;">
             ${escapeHtml(story.title)}
           </a>
-          ${story.summary ? `<p style="font-family:${FONT_STACK};color:${COLORS.body};font-size:14px;line-height:1.65;margin:8px 0 6px;">${escapeHtml(story.summary)}</p>` : ""}
+          ${summary ? `<p style="font-family:${FONT_STACK};color:${COLORS.body};font-size:14px;line-height:1.65;margin:8px 0 6px;">${escapeHtml(summary)}</p>` : ""}
           <div style="font-family:${FONT_STACK};font-size:12px;color:${COLORS.muted};">
-            ${story.sources.map((s) => escapeHtml(s.name)).join(" &middot; ")}
+            ${sourcesHtml}
           </div>
         </td>
       </tr>
