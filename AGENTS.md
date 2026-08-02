@@ -13,7 +13,7 @@ Browser ──► Vercel Hobby ($0) ──► Supabase Free ($0)
                   ▲
                   │
         GitHub Actions ($0) ── cron */6h ──► scripts/ingest.ts (langsung ke DB)
-                              ── cron 22:00 ─► scripts/digest.ts (langsung ke DB + Resend)
+                              ── cron 20:00 WIB ─► scripts/digest.ts (langsung ke DB + Resend)
                               ── cron */5  ──► /api/health (keep-alive)
 
 Alur ingest & digest (langsung dari GitHub Actions, tanpa Vercel):

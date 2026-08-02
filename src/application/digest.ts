@@ -19,7 +19,7 @@ export function buildDigestHtml(
 
   return emailLayout({
     preheader: `${stories.length} peristiwa terpanas 24 jam terakhir — ${topTitles}`,
-    title: `Digest pagi, ${stories.length} peristiwa terpanas`,
+    title: `Digest malam, ${stories.length} peristiwa terpanas`,
     content: `
       <p style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#44403c;font-size:14px;line-height:1.7;margin:0 0 8px;">
         Satu peristiwa, semua sudut pandang. Berikut ${stories.length} peristiwa yang paling banyak diberitakan 24 jam terakhir &mdash; dirangkum netral, tanpa bias.
@@ -54,7 +54,7 @@ export function makeDigest(deps: {
       for (const sub of subscribers) {
         const res = await mailer.send({
           to: sub.email,
-          subject: `☕ Digest Lensa: ${stories[0]?.title.slice(0, 60) ?? "Berita hari ini"}`,
+          subject: `🌙 Digest Lensa: ${stories[0]?.title.slice(0, 60) ?? "Berita hari ini"}`,
           html: buildDigestHtml(stories, baseUrl, sub.unsubscribe_token),
           textFallback: `Digest Lensa hari ini: ${stories.map((s) => s.title).join(" | ")}`,
         });
