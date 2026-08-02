@@ -7,7 +7,7 @@ async function main() {
     "[digest] linkBase:",
     config.baseUrl.includes("localhost")
       ? "LOCALHOST (BUG!)"
-      : `PRODUCTION OK (${config.baseUrl})`
+      : `PRODUCTION OK (host=${new URL(config.baseUrl).host})`
   );
 
   const container = getContainer();
